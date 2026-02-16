@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
 import { useAuth } from '@/hooks/useAuth';
 import { UserLogin, UserRole } from '@/types';
 import { useAuthStore, roleLabels } from '@/store/authStore';
 import { Bug } from 'lucide-react';
+import { api } from '@/services/api';
+import toast from 'react-hot-toast';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { isDevMode, devAutoLogin } = useAuthStore();
+  const { isDevMode, devAutoLogin, setAuth } = useAuthStore();
   const [credentials, setCredentials] = useState<UserLogin>({
     email: '',
     password: '',
   });
+  const [needsRoleSelection, setNeedsRoleSelection] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +35,84 @@ export const LoginPage = () => {
     navigate('/');
   };
 
+  const handleGoogleSuccess = async (credentialResponse: any) => {
+    setIsOAuthLoading(true);
+    try {
+      const result = await api.oauthLogin('google', credentialResponse.credential);
+      
+      // Store tokens
+      localStorage.setItem('token', result.access_token);
+      localStorage.setItem('refreshToken', result.refresh_token);
+      
+      if (result.needs_role_selection) {
+        // Show role selection modal
+        setNewUserEmail(result.email);
+        setNeedsRoleSelection(true);
+      } else {
+        // Complete login
+        setAuth(result.access_token, {
+          id: result.user_id,
+          email: result.email,
+          first_name: result.first_name,
+          last_name: result.last_name,
+          role: result.role as UserRole,
+        });
+        navigate('/');
+        toast.success(`Willkommen, ${result.first_name}!`);
+      }
+    } catch (error) {
+      toast.error('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
+    } finally {
+      setIsOAuthLoading(false);
+    }
+  };
+
+  const handleAppleSuccess = async (event: any) => {
+    // Apple Sign In success handler
+    // Apple returns a different structure, handle accordingly
+    setIsOAuthLoading(true);
+    try {
+      const { authorization } = event.detail;
+      const result = await api.oauthLogin('apple', authorization.id_token);
+      
+      localStorage.setItem('token', result.access_token);
+      localStorage.setItem('refreshToken', result.refresh_token);
+      
+      if (result.needs_role_selection) {
+        setNewUserEmail(result.email);
+        setNeedsRoleSelection(true);
+      } else {
+        setAuth(result.access_token, {
+          id: result.user_id,
+          email: result.email,
+          first_name: result.first_name,
+          last_name: result.last_name,
+          role: result.role as UserRole,
+        });
+        navigate('/');
+        toast.success(`Willkommen, ${result.first_name}!`);
+      }
+    } catch (error) {
+      toast.error('Apple-Anmeldung fehlgeschlagen.');
+    } finally {
+      setIsOAuthLoading(false);
+    }
+  };
+
+  const handleRoleSelection = async (role: UserRole) => {
+    try {
+      await api.setOAuthRole(role);
+      toast.success('Rolle gespeichert! Anmeldung erfolgreich.');
+      navigate('/');
+    } catch (error) {
+      toast.error('Fehler beim Speichern der Rolle.');
+    }
+  };
+
   const roles = Object.values(UserRole);
+
+  // Google Client ID from environment or empty for development
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -46,6 +129,46 @@ export const LoginPage = () => {
         </div>
         
         <div className="bg-white rounded-xl shadow-sm border p-8">
+          {/* OAuth Login Buttons */}
+          <div className="space-y-3 mb-6">
+            {/* Google Sign In */}
+            {googleClientId && (
+              <div className="flex justify-center">
+                <GoogleOAuthProvider clientId={googleClientId}>
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => toast.error('Google-Anmeldung fehlgeschlagen')}
+                    useOneTap
+                  />
+                </GoogleOAuthProvider>
+              </div>
+            )}
+            
+            {/* Apple Sign In Button */}
+            <button
+              onClick={() => {
+                // Apple Sign In (would be implemented with Apple JS SDK)
+                toast.info('Apple Anmeldung wird geladen...');
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={isOAuthLoading}
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.2-.93 3.52-.84 1.55.1 2.68.67 3.44 1.65-2.88 1.68-2.24 5.98.22 7.13-.34 1.48-.84 2.9-1.26 4.23zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+              </svg>
+              <span>Mit Apple anmelden</span>
+            </button>
+          </div>
+          
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">oder</span>
+            </div>
+          </div>
+          
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="label">Email</label>
@@ -85,6 +208,29 @@ export const LoginPage = () => {
             <p>admin@handball.de / admin123</p>
           </div>
         </div>
+
+        {/* Role Selection Modal */}
+        {needsRoleSelection && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
+              <h2 className="text-lg font-semibold mb-2">Wähle deine Rolle</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                {newUserEmail} - Bitte wähle deine Rolle im Verein aus:
+              </p>
+              <div className="space-y-2">
+                {roles.map((role) => (
+                  <button
+                    key={role}
+                    onClick={() => handleRoleSelection(role)}
+                    className="w-full px-4 py-2 text-left rounded-lg border hover:bg-primary-50 hover:border-primary-300 transition-colors"
+                  >
+                    <span className="font-medium">{roleLabels[role]}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dev Auto-Login Section */}
         {isDevMode && (

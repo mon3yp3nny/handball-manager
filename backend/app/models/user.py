@@ -1,3 +1,4 @@
+"""User model with OAuth support."""
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -18,13 +19,14 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # Nullable for OAuth-only users
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
     role = Column(Enum(UserRole), default=UserRole.PLAYER, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    is_oauth_only = Column(Boolean, default=False)  # True if user only has OAuth login
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -32,3 +34,4 @@ class User(Base):
     player_profile = relationship("Player", back_populates="user", uselist=False)
     children = relationship("ParentChild", back_populates="parent", foreign_keys="ParentChild.parent_id")
     managed_teams = relationship("Team", back_populates="coach")
+    oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")

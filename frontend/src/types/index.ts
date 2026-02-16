@@ -8,16 +8,15 @@ export enum UserRole {
 }
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   first_name: string;
   last_name: string;
   phone?: string;
   role: UserRole;
   is_active: boolean;
-  is_verified: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface UserLogin {
@@ -38,18 +37,35 @@ export interface TokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
+  user?: User;
+}
+
+// OAuth Types
+export interface OAuthLoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user_id: string;
+  email: string;
+  role: string;
+  first_name: string;
+  last_name: string;
+  is_new_user: boolean;
+  needs_role_selection: boolean;
 }
 
 // Team Types
 export interface Team {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   age_group?: string;
-  coach_id?: number;
+  coach_id?: string;
+  supervisor_id?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   player_count?: number;
+  coach_name?: string;
 }
 
 export interface TeamWithPlayers extends Team {
@@ -68,10 +84,23 @@ export enum Position {
   DEFENSE = 'defense',
 }
 
+export const PositionLabels: Record<Position, string> = {
+  [Position.GOALKEEPER]: 'Torwart',
+  [Position.LEFT_WING]: 'Linksaußen',
+  [Position.LEFT_BACK]: 'Rückraum Links',
+  [Position.CENTER_BACK]: 'Kreisläufer',
+  [Position.RIGHT_BACK]: 'Rückraum Rechts',
+  [Position.RIGHT_WING]: 'Rechtsaußen',
+  [Position.PIVOT]: 'Kreisläufer',
+  [Position.DEFENSE]: 'Defensiv',
+};
+
 export interface Player {
-  id: number;
-  user_id: number;
-  team_id?: number;
+  id: string;
+  user_id?: string;
+  user?: User;
+  team_id?: string;
+  team_name?: string;
   jersey_number?: number;
   position?: Position;
   date_of_birth?: string;
@@ -79,10 +108,30 @@ export interface Player {
   emergency_contact_phone?: string;
   games_played: number;
   goals_scored: number;
-  assists: number;
+  assists?: number;
+  parent_ids?: string[];
+  parents?: ParentInfo[];
+  created_at?: string;
+  updated_at?: string;
+  joined_date?: string;
+  birth_date?: string;
+  emergency_contact?: string;
+}
+
+// Parent-Child Relationship
+export interface ParentChildRelationship {
+  id: string;
+  parent_id: string;
+  player_id: string;
   created_at: string;
-  updated_at: string;
-  user?: User;
+}
+
+export interface ParentInfo {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
 }
 
 // Game Types
@@ -101,23 +150,24 @@ export enum GameType {
 }
 
 export interface Game {
-  id: number;
-  team_id: number;
+  id: string;
+  team_id: string;
+  team_name?: string;
   opponent: string;
+  opponent_logo?: string | null;
   location: string;
   scheduled_at: string;
-  game_type: GameType;
-  status: GameStatus;
-  home_score?: number;
-  away_score?: number;
-  is_home_game: boolean;
+  game_type?: GameType;
+  status: GameStatus | string;
+  home_score?: number | null;
+  away_score?: number | null;
+  is_home_game?: boolean;
   notes?: string;
-  created_at: string;
-  updated_at: string;
-  team_name?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Event Types
+// Event Types with Visibility
 export enum EventType {
   TRAINING = 'training',
   MEETING = 'meeting',
@@ -125,18 +175,42 @@ export enum EventType {
   OTHER = 'other',
 }
 
+export enum EventVisibility {
+  TEAM = 'team',
+  CLUB = 'club',
+  AGE_GROUP = 'age_group',
+  PRIVATE = 'private',
+}
+
+export const EventTypeLabels: Record<EventType, string> = {
+  [EventType.TRAINING]: 'Training',
+  [EventType.MEETING]: 'Besprechung',
+  [EventType.TOURNAMENT]: 'Turnier',
+  [EventType.OTHER]: 'Sonstiges',
+};
+
+export const EventVisibilityLabels: Record<EventVisibility, string> = {
+  [EventVisibility.TEAM]: 'Mannschaft',
+  [EventVisibility.CLUB]: 'Verein',
+  [EventVisibility.AGE_GROUP]: 'Altersklasse',
+  [EventVisibility.PRIVATE]: 'Privat',
+};
+
 export interface Event {
-  id: number;
+  id: string;
   title: string;
   description?: string;
-  team_id: number;
-  event_type: EventType;
+  team_id?: string | null;
+  team_name?: string;
+  event_type: EventType | string;
+  visibility: EventVisibility | string;
+  age_group?: string;
   location?: string;
   start_time: string;
   end_time: string;
-  created_at: string;
-  updated_at: string;
-  team_name?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Attendance Types
@@ -147,32 +221,54 @@ export enum AttendanceStatus {
   PENDING = 'pending',
 }
 
+export const AttendanceStatusLabels: Record<AttendanceStatus, string> = {
+  [AttendanceStatus.PRESENT]: 'Anwesend',
+  [AttendanceStatus.ABSENT]: 'Abwesend',
+  [AttendanceStatus.EXCUSED]: 'Entschuldigt',
+  [AttendanceStatus.PENDING]: 'Ausstehend',
+};
+
 export interface Attendance {
-  id: number;
-  player_id: number;
-  game_id?: number;
-  event_id?: number;
-  status: AttendanceStatus;
-  notes?: string;
-  recorded_by?: number;
-  recorded_at: string;
+  id: string;
+  player_id: string;
   player_name?: string;
   player_jersey?: number;
+  game_id?: string;
+  event_id?: string;
+  event_name?: string;
+  status: AttendanceStatus | string;
+  notes?: string;
+  recorded_by?: string;
+  recorded_at: string;
 }
 
 // News Types
 export interface News {
-  id: number;
+  id: string;
   title: string;
   content: string;
-  team_id?: number;
-  author_id: number;
-  is_published: boolean;
+  team_id?: string | null;
+  author_id?: string;
+  is_published?: boolean;
   published_at?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   author_name?: string;
   team_name?: string;
+}
+
+// Invitation Types
+export interface Invitation {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  invited_by: string;
+  team_id?: string;
+  status: 'pending' | 'accepted' | 'expired';
+  created_at: string;
+  expires_at: string;
 }
 
 // API Response Types
@@ -197,5 +293,55 @@ export interface CalendarEvent {
   end: Date;
   type: 'game' | 'event';
   location?: string;
-  teamId: number;
+  teamId?: string;
+}
+
+// Notification Types
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  read: boolean;
+  created_at: string;
+  user_id?: string;
+  link?: string;
+}
+
+// Form Types
+export interface PlayerCreationForm {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+  date_of_birth?: string;
+  jersey_number?: number;
+  position?: Position;
+  team_id?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  parent_ids?: string[];
+}
+
+export interface ParentAssignmentForm {
+  player_id: string;
+  parent_id?: string;
+  new_parent?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone?: string;
+  };
+}
+
+export interface EventCreationForm {
+  title: string;
+  description?: string;
+  event_type: EventType;
+  visibility: EventVisibility;
+  team_id?: string;
+  age_group?: string;
+  location?: string;
+  start_time: string;
+  end_time: string;
 }

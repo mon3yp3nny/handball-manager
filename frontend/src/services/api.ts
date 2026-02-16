@@ -106,6 +106,21 @@ class ApiService {
     return response.data;
   }
 
+  // OAuth Login
+  async oauthLogin(provider: 'google' | 'apple', token: string, firstName?: string, lastName?: string): Promise<OAuthLoginResponse> {
+    const response = await this.client.post<OAuthLoginResponse>(`/oauth/${provider}`, {
+      token,
+      provider,
+      first_name: firstName,
+      last_name: lastName,
+    });
+    return response.data;
+  }
+
+  async setOAuthRole(role: string): Promise<void> {
+    await this.client.post('/oauth/set-role', { role });
+  }
+
   async refreshToken(refreshToken: string): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>('/auth/refresh', {
       refresh_token: refreshToken,

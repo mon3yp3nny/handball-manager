@@ -7,6 +7,7 @@ from app.models.game import Game, GameStatus, GameType
 from app.models.event import Event, EventType
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.news import News
+from app.models.oauth_account import OAuthAccount, OAuthProvider
 
 __all__ = [
     "Base",
@@ -24,4 +25,6 @@ __all__ = [
     "Attendance",
     "AttendanceStatus",
     "News",
+    "OAuthAccount",
+    "OAuthProvider",
 ]
