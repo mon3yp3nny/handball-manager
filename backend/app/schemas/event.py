@@ -6,6 +6,7 @@ from enum import Enum
 
 class EventType(str, Enum):
     TRAINING = "training"
+    GAME = "game"
     MEETING = "meeting"
     TOURNAMENT = "tournament"
     OTHER = "other"

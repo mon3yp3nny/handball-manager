@@ -51,6 +51,49 @@ def get_attendance(
     return records
 
 
+@router.post("/event/{event_id}/initialize", status_code=status.HTTP_201_CREATED)
+def initialize_event_attendance(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_coach_or_supervisor)
+):
+    """Initialize attendance records for all team players for an event"""
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Authorization
+    if current_user.role == UserRole.COACH and event.team_id:
+        team = db.query(Team).filter(Team.id == event.team_id).first()
+        if not team or team.coach_id != current_user.id:
+            if current_user.role != UserRole.ADMIN:
+                raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Get all players in the team
+    players = db.query(Player).filter(Player.team_id == event.team_id).all()
+    
+    created_count = 0
+    for player in players:
+        # Check if record already exists
+        existing = db.query(Attendance).filter(
+            Attendance.player_id == player.id,
+            Attendance.event_id == event_id
+        ).first()
+        
+        if not existing:
+            attendance = Attendance(
+                player_id=player.id,
+                event_id=event_id,
+                status=AttendanceStatus.PENDING,
+                recorded_by=current_user.id
+            )
+            db.add(attendance)
+            created_count += 1
+    
+    db.commit()
+    return {"message": f"Created {created_count} attendance records", "created": created_count}
+
+
 @router.post("/", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 def create_attendance(
     attendance_data: AttendanceCreate,
@@ -207,6 +250,76 @@ def bulk_update_attendance(
     
     db.commit()
     return updated_records
+
+
+@router.get("/event/{event_id}/summary")
+def get_event_attendance_summary(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_coach_or_supervisor)
+):
+    """Get attendance summary for an event (for coaches/admins)"""
+    from sqlalchemy import func
+    
+    # Get event info
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    
+    # Get all attendance records with player info
+    attendance_records = db.query(
+        Attendance, User.first_name, User.last_name, Player.jersey_number
+    ).join(Player, Attendance.player_id == Player.id
+    ).join(User, Player.user_id == User.id
+    ).filter(Attendance.event_id == event_id).all()
+    
+    # Get all team players (to check who hasn't responded yet)
+    team_players = []
+    if event.team_id:
+        team_players = db.query(Player, User.first_name, User.last_name).join(
+            User, Player.user_id == User.id
+        ).filter(Player.team_id == event.team_id).all()
+    
+    # Calculate summary
+    records = [r[0] for r in attendance_records]
+    total = len(records)
+    present = sum(1 for r in records if r.status == AttendanceStatus.PRESENT)
+    absent = sum(1 for r in records if r.status == AttendanceStatus.ABSENT)
+    excused = sum(1 for r in records if r.status == AttendanceStatus.EXCUSED)
+    pending = sum(1 for r in records if r.status == AttendanceStatus.PENDING)
+    
+    return {
+        "event_id": event_id,
+        "event_title": event.title,
+        "total_players": len(team_players) if team_players else total,
+        "responded": total,
+        "present": present,
+        "absent": absent,
+        "excused": excused,
+        "pending": len(team_players) - total if team_players else pending,
+        "attendance_rate": round((present / len(team_players) * 100), 2) if team_players and len(team_players) > 0 else (round((present / total * 100), 2) if total > 0 else 0),
+        "records": [
+            {
+                "id": r[0].id,
+                "player_id": r[0].player_id,
+                "player_name": f"{r[1]} {r[2]}",
+                "jersey_number": r[3],
+                "status": r[0].status,
+                "notes": r[0].notes,
+                "recorded_at": r[0].recorded_at
+            }
+            for r in attendance_records
+        ],
+        "unresponded": [
+            {
+                "player_id": tp[0].id,
+                "player_name": f"{tp[1]} {tp[2]}",
+                "jersey_number": tp[0].jersey_number
+            }
+            for tp in team_players
+            if tp[0].id not in [r[0].player_id for r in attendance_records]
+        ] if team_players else []
+    }
 
 
 @router.get("/stats/player/{player_id}")

@@ -7,6 +7,7 @@ from app.db.session import Base
 
 class EventType(str, enum.Enum):
     TRAINING = "training"
+    GAME = "game"
     MEETING = "meeting"
     TOURNAMENT = "tournament"
     OTHER = "other"
