@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { UserLogin } from '@/types';
+import { UserLogin, UserRole } from '@/types';
+import { useAuthStore, roleLabels } from '@/store/authStore';
+import { Bug } from 'lucide-react';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { isDevMode, devAutoLogin } = useAuthStore();
   const [credentials, setCredentials] = useState<UserLogin>({
     email: '',
     password: '',
@@ -20,6 +23,13 @@ export const LoginPage = () => {
       // Error handled by mutation
     }
   };
+
+  const handleDevLogin = (role: UserRole) => {
+    devAutoLogin(role);
+    navigate('/');
+  };
+
+  const roles = Object.values(UserRole);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -75,6 +85,30 @@ export const LoginPage = () => {
             <p>admin@handball.de / admin123</p>
           </div>
         </div>
+
+        {/* Dev Auto-Login Section */}
+        {isDevMode && (
+          <div className="mt-6 bg-yellow-50 rounded-xl border border-yellow-200 p-6">
+            <div className="flex items-center justify-center mb-4">
+              <Bug className="w-5 h-5 text-yellow-600 mr-2" />
+              <h3 className="text-sm font-semibold text-yellow-800">Entwicklungs-Modus</h3>
+            </div>
+            <p className="text-xs text-yellow-600 text-center mb-4">
+              Schneller Login mit Test-Rollen
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {roles.map((role) => (
+                <button
+                  key={role}
+                  onClick={() => handleDevLogin(role)}
+                  className="px-3 py-2 rounded-lg text-xs font-medium bg-white border border-yellow-300 text-yellow-700 hover:bg-yellow-100 transition-colors"
+                >
+                  Als {roleLabels[role]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

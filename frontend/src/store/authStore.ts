@@ -2,6 +2,62 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserRole, Team, CalendarEvent } from '@/types';
 
+// Demo users for development
+const demoUsers: Record<UserRole, User> = {
+  [UserRole.ADMIN]: {
+    id: 'admin-1',
+    email: 'admin@handball.de',
+    first_name: 'Max',
+    last_name: 'Admin',
+    role: UserRole.ADMIN,
+    phone: '+49 123 456789',
+    created_at: new Date().toISOString(),
+    is_active: true,
+  },
+  [UserRole.COACH]: {
+    id: 'coach-1',
+    email: 'coach@handball.de',
+    first_name: 'Thomas',
+    last_name: 'Trainer',
+    role: UserRole.COACH,
+    phone: '+49 123 456790',
+    created_at: new Date().toISOString(),
+    is_active: true,
+  },
+  [UserRole.SUPERVISOR]: {
+    id: 'supervisor-1',
+    email: 'supervisor@handball.de',
+    first_name: 'Anna',
+    last_name: 'Betreuer',
+    role: UserRole.SUPERVISOR,
+    phone: '+49 123 456791',
+    created_at: new Date().toISOString(),
+    is_active: true,
+  },
+  [UserRole.PLAYER]: {
+    id: 'player-1',
+    email: 'spieler@handball.de',
+    first_name: 'Lukas',
+    last_name: 'Spieler',
+    role: UserRole.PLAYER,
+    phone: '+49 123 456792',
+    created_at: new Date().toISOString(),
+    is_active: true,
+  },
+  [UserRole.PARENT]: {
+    id: 'parent-1',
+    email: 'eltern@handball.de',
+    first_name: 'Maria',
+    last_name: 'Elternteil',
+    role: UserRole.PARENT,
+    phone: '+49 123 456793',
+    created_at: new Date().toISOString(),
+    is_active: true,
+  },
+};
+
+const DEV_TOKEN = 'dev-token-for-testing-only';
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -10,6 +66,10 @@ interface AuthState {
   setToken: (token: string | null) => void;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
+  // Dev features
+  devAutoLogin: (role: UserRole) => void;
+  devSwitchRole: (role: UserRole) => void;
+  isDevMode: boolean;
 }
 
 interface UIState {
@@ -17,6 +77,9 @@ interface UIState {
   setSidebarOpen: (open: boolean) => void;
   currentTeam: Team | null;
   setCurrentTeam: (team: Team | null) => void;
+  // Dev role switcher
+  showDevSwitcher: boolean;
+  setShowDevSwitcher: (show: boolean) => void;
 }
 
 interface NotificationState {
@@ -26,16 +89,31 @@ interface NotificationState {
   clearNotifications: () => void;
 }
 
+const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
+
 export const useAuthStore = create<AuthState>(
   persist(
     (set) => ({
       user: null,
       isAuthenticated: false,
       token: null,
+      isDevMode: isDev,
       setUser: (user) => set({ user }),
       setToken: (token) => set({ token, isAuthenticated: !!token }),
       setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
       logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      // Dev auto-login
+      devAutoLogin: (role) => {
+        if (!isDev) return;
+        const user = demoUsers[role];
+        set({ user, token: DEV_TOKEN, isAuthenticated: true, isDevMode: true });
+      },
+      // Dev role switch
+      devSwitchRole: (role) => {
+        if (!isDev) return;
+        const user = demoUsers[role];
+        set({ user });
+      },
     }),
     {
       name: 'auth-storage',
@@ -48,6 +126,8 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   currentTeam: null,
   setCurrentTeam: (team) => set({ currentTeam: team }),
+  showDevSwitcher: isDev,
+  setShowDevSwitcher: (show) => set({ showDevSwitcher: show }),
 }));
 
 export const useNotificationStore = create<NotificationState>((set) => ({
@@ -66,6 +146,7 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 // Helper hook for role checking
 export const useRole = () => {
   const user = useAuthStore((state) => state.user);
+  const isDevMode = useAuthStore((state) => state.isDevMode);
   
   return {
     isAdmin: user?.role === UserRole.ADMIN,
@@ -75,5 +156,23 @@ export const useRole = () => {
     isParent: user?.role === UserRole.PARENT,
     role: user?.role,
     user,
+    isDevMode,
   };
+};
+
+// Dev role labels for UI
+export const roleLabels: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'Administrator',
+  [UserRole.COACH]: 'Trainer',
+  [UserRole.SUPERVISOR]: 'Betreuer',
+  [UserRole.PLAYER]: 'Spieler',
+  [UserRole.PARENT]: 'Eltern',
+};
+
+export const roleColors: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'bg-red-100 text-red-800',
+  [UserRole.COACH]: 'bg-blue-100 text-blue-800',
+  [UserRole.SUPERVISOR]: 'bg-green-100 text-green-800',
+  [UserRole.PLAYER]: 'bg-purple-100 text-purple-800',
+  [UserRole.PARENT]: 'bg-orange-100 text-orange-800',
 };

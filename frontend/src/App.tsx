@@ -61,7 +61,7 @@ function App() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/login" element={<isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
 
       {/* Protected routes */}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

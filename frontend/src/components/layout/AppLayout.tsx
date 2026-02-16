@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
+import { DevRoleSwitcher } from '@/components/dev/DevRoleSwitcher';
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -29,6 +30,9 @@ export const AppLayout = () => {
         {/* Mobile bottom nav */}
         <MobileNav />
       </div>
+      
+      {/* Dev Role Switcher - only in development */}
+      <DevRoleSwitcher />
     </div>
   );
 };

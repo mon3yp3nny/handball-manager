@@ -1,0 +1,23 @@
+{
+  "name": "handball-manager",
+  "version": "1.0.0",
+  "description": "A comprehensive handball club management application for managing teams, players, games, and events.",
+  "main": "playwright-screenshots.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mon3yp3nny/handball-manager.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mon3yp3nny/handball-manager/issues"
+  },
+  "homepage": "https://github.com/mon3yp3nny/handball-manager#readme",
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}
