@@ -21,3 +21,4 @@ class Team(Base):
     games = relationship("Game", back_populates="team")
     events = relationship("Event", back_populates="team")
     news = relationship("News", back_populates="team")
+    invitations = relationship("Invitation", back_populates="team")

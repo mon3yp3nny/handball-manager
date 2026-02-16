@@ -8,6 +8,7 @@ from app.models.event import Event, EventType
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.news import News
 from app.models.oauth_account import OAuthAccount, OAuthProvider
+from app.models.invitation import Invitation, InvitationStatus
 
 __all__ = [
     "Base",
@@ -27,4 +28,6 @@ __all__ = [
     "News",
     "OAuthAccount",
     "OAuthProvider",
+    "Invitation",
+    "InvitationStatus",
 ]

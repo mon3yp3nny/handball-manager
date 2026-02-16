@@ -35,3 +35,4 @@ class User(Base):
     children = relationship("ParentChild", back_populates="parent", foreign_keys="ParentChild.parent_id")
     managed_teams = relationship("Team", back_populates="coach")
     oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
+    sent_invitations = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="inviter")
