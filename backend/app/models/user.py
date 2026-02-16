@@ -36,3 +36,4 @@ class User(Base):
     managed_teams = relationship("Team", back_populates="coach")
     oauth_accounts = relationship("OAuthAccount", back_populates="user", cascade="all, delete-orphan")
     sent_invitations = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="inviter")
+    activities = relationship("UserActivity", back_populates="user", order_by="desc(UserActivity.created_at)")

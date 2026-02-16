@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime, timedelta
 
 from app.core import security
 from app.core.deps import get_db, get_current_user, require_admin, require_coach
@@ -59,6 +60,31 @@ def create_user(
         db.commit()
     
     return db_user
+
+
+@router.get("/me/activity", response_model=List[dict])
+def get_my_activity(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get activity log for current user"""
+    from app.models.user_activity import UserActivity
+    
+    activities = db.query(UserActivity).filter(
+        UserActivity.user_id == current_user.id
+    ).order_by(UserActivity.created_at.desc()).offset(skip).limit(limit).all()
+    
+    return [
+        {
+            "id": a.id,
+            "activity_type": a.activity_type,
+            "description": a.description,
+            "created_at": a.created_at
+        }
+        for a in activities
+    ]
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -125,3 +151,132 @@ def delete_user(
     user.is_active = False
     db.commit()
     return {"message": "User deactivated"}
+
+
+@router.post("/{user_id}/reset-password", status_code=status.HTTP_200_OK)
+def reset_user_password(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Admin: Reset user password and generate temporary password"""
+    import secrets
+    import string
+    from app.models.user_activity import UserActivity, ActivityType
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate temporary password
+    temp_password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+    
+    # Update password
+    user.hashed_password = security.get_password_hash(temp_password)
+    db.commit()
+    
+    # Log activity
+    activity = UserActivity(
+        user_id=user_id,
+        activity_type=ActivityType.PASSWORD_CHANGE,
+        description=f"Password reset by admin ({current_user.email})"
+    )
+    db.add(activity)
+    db.commit()
+    
+    return {
+        "message": "Password reset successfully",
+        "temp_password": temp_password
+    }
+
+
+@router.get("/{user_id}/activity", response_model=List[dict])
+def get_user_activity(
+    user_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Admin: Get activity log for specific user"""
+    from app.models.user_activity import UserActivity
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    activities = db.query(UserActivity).filter(
+        UserActivity.user_id == user_id
+    ).order_by(UserActivity.created_at.desc()).offset(skip).limit(limit).all()
+    
+    return [
+        {
+            "id": a.id,
+            "activity_type": a.activity_type,
+            "description": a.description,
+            "created_at": a.created_at
+        }
+        for a in activities
+    ]
+
+
+@router.get("/admin/stats", response_model=dict)
+def get_user_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Admin dashboard stats"""
+    from sqlalchemy import func
+    
+    total_users = db.query(User).count()
+    active_users = db.query(User).filter(User.is_active == True).count()
+    users_by_role = db.query(User.role, func.count(User.id)).group_by(User.role).all()
+    
+    # Recent activity
+    recent_activity = db.query(func.count(UserActivity.id)).filter(
+        UserActivity.created_at >= datetime.utcnow() - timedelta(days=7)
+    ).scalar()
+    
+    return {
+        "total_users": total_users,
+        "active_users": active_users,
+        "inactive_users": total_users - active_users,
+        "users_by_role": {str(role): count for role, count in users_by_role},
+        "recent_activity_7d": recent_activity
+    }
+
+
+@router.post("/admin/bulk-activate")
+def bulk_activate_users(
+    user_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Bulk activate multiple users"""
+    updated = 0
+    for user_id in user_ids:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and not user.is_active:
+            user.is_active = True
+            updated += 1
+    
+    db.commit()
+    return {"message": f"Activated {updated} users"}
+
+
+@router.post("/admin/bulk-deactivate")
+def bulk_deactivate_users(
+    user_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Bulk deactivate multiple users"""
+    updated = 0
+    for user_id in user_ids:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.is_active:
+            user.is_active = False
+            updated += 1
+    
+    db.commit()
+    return {"message": f"Deactivated {updated} users"}

@@ -4,11 +4,12 @@ from app.models.team import Team
 from app.models.player import Player, Position
 from app.models.parent_child import ParentChild
 from app.models.game import Game, GameStatus, GameType
-from app.models.event import Event, EventType
+from app.models.event import Event, EventType, EventVisibility
 from app.models.attendance import Attendance, AttendanceStatus
 from app.models.news import News
 from app.models.oauth_account import OAuthAccount, OAuthProvider
 from app.models.invitation import Invitation, InvitationStatus
+from app.models.user_activity import UserActivity, ActivityType
 
 __all__ = [
     "Base",
@@ -23,6 +24,7 @@ __all__ = [
     "GameType",
     "Event",
     "EventType",
+    "EventVisibility",
     "Attendance",
     "AttendanceStatus",
     "News",
@@ -30,4 +32,6 @@ __all__ = [
     "OAuthProvider",
     "Invitation",
     "InvitationStatus",
+    "UserActivity",
+    "ActivityType",
 ]
