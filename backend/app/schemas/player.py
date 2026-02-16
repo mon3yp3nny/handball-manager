@@ -60,6 +60,18 @@ class PlayerResponse(PlayerBase):
 
 class PlayerWithStats(PlayerResponse):
     team_name: Optional[str] = None
+    parents: List["ParentInfo"] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class ParentInfo(BaseModel):
+    id: int
+    email: str
+    first_name: str
+    last_name: str
+    phone: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -68,3 +80,4 @@ class PlayerWithStats(PlayerResponse):
 # Import for circular reference
 from app.schemas.user import UserBase
 PlayerResponse.model_rebuild()
+PlayerWithStats.model_rebuild()

@@ -169,7 +169,52 @@ def get_player(
             if player.team_id not in child_team_ids:
                 raise HTTPException(status_code=403, detail="Not authorized")
     
-    return player
+    # Load team name and parents
+    team = db.query(Team).filter(Team.id == player.team_id).first()
+    parents = db.query(User).join(
+        ParentChild, ParentChild.parent_id == User.id
+    ).filter(ParentChild.child_id == player_id).all()
+    
+    player_data = {
+        "id": player.id,
+        "user_id": player.user_id,
+        "team_id": player.team_id,
+        "jersey_number": player.jersey_number,
+        "position": player.position,
+        "date_of_birth": player.date_of_birth,
+        "emergency_contact_name": player.emergency_contact_name,
+        "emergency_contact_phone": player.emergency_contact_phone,
+        "games_played": player.games_played,
+        "goals_scored": player.goals_scored,
+        "assists": player.assists,
+        "created_at": player.created_at,
+        "updated_at": player.updated_at,
+        "user": {
+            "id": player.user.id,
+            "email": player.user.email,
+            "first_name": player.user.first_name,
+            "last_name": player.user.last_name,
+            "phone": player.user.phone,
+            "role": player.user.role,
+            "is_active": player.user.is_active,
+            "is_verified": player.user.is_verified,
+            "created_at": player.user.created_at,
+            "updated_at": player.user.updated_at
+        },
+        "team_name": team.name if team else None,
+        "parents": [
+            {
+                "id": p.id,
+                "email": p.email,
+                "first_name": p.first_name,
+                "last_name": p.last_name,
+                "phone": p.phone
+            }
+            for p in parents
+        ]
+    }
+    
+    return player_data
 
 
 @router.put("/{player_id}", response_model=PlayerResponse)
