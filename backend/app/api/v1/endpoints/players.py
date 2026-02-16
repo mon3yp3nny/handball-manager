@@ -291,3 +291,130 @@ def get_player_children(
     ).filter(ParentChild.parent_id == current_user.id).all()
     
     return children
+
+
+@router.get("/me/schedule", response_model=dict)
+def get_my_schedule(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get logged-in player's team schedule (games and training)"""
+    from app.models.game import Game
+    from app.models.event import Event
+    from datetime import datetime
+    
+    if current_user.role != UserRole.PLAYER:
+        raise HTTPException(status_code=403, detail="Only players can access this endpoint")
+    
+    player = db.query(Player).filter(Player.user_id == current_user.id).first()
+    if not player or not player.team_id:
+        raise HTTPException(status_code=404, detail="Player or team not found")
+    
+    # Get upcoming games
+    now = datetime.utcnow()
+    games = db.query(Game).filter(
+        Game.team_id == player.team_id,
+        Game.game_time >= now
+    ).order_by(Game.game_time).all()
+    
+    # Get upcoming training/events
+    events = db.query(Event).filter(
+        Event.team_id == player.team_id,
+        Event.start_time >= now
+    ).order_by(Event.start_time).all()
+    
+    return {
+        "team_id": player.team_id,
+        "team_name": player.team.name if player.team else None,
+        "upcoming_games": [
+            {
+                "id": g.id,
+                "opponent": g.opponent,
+                "game_time": g.game_time,
+                "location": g.location,
+                "is_home": g.is_home
+            }
+            for g in games[:5]  # Limit to 5
+        ],
+        "upcoming_training": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "event_type": e.event_type,
+                "start_time": e.start_time,
+                "end_time": e.end_time,
+                "location": e.location
+            }
+            for e in events if e.event_type == Event.EventType.TRAINING
+        ][:10],  # Limit to 10
+    }
+
+
+@router.put("/me/contacts", response_model=PlayerWithStats)
+def update_my_contact_info(
+    player_data: PlayerUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Player can update their own contact info"""
+    if current_user.role != UserRole.PLAYER:
+        raise HTTPException(status_code=403, detail="Only players can use this endpoint")
+    
+    player = db.query(Player).filter(Player.user_id == current_user.id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player profile not found")
+    
+    # Players can only update certain fields
+    allowed_fields = ['emergency_contact_name', 'emergency_contact_phone', 'jersey_number']
+    update_data = player_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        if field in allowed_fields:
+            setattr(player, field, value)
+    
+    db.commit()
+    db.refresh(player)
+    
+    # Return in the same format as get_player
+    team = db.query(Team).filter(Team.id == player.team_id).first()
+    parents = db.query(User).join(
+        ParentChild, ParentChild.parent_id == User.id
+    ).filter(ParentChild.child_id == player.id).all()
+    
+    return {
+        "id": player.id,
+        "user_id": player.user_id,
+        "team_id": player.team_id,
+        "jersey_number": player.jersey_number,
+        "position": player.position,
+        "date_of_birth": player.date_of_birth,
+        "emergency_contact_name": player.emergency_contact_name,
+        "emergency_contact_phone": player.emergency_contact_phone,
+        "games_played": player.games_played,
+        "goals_scored": player.goals_scored,
+        "assists": player.assists,
+        "created_at": player.created_at,
+        "updated_at": player.updated_at,
+        "user": {
+            "id": player.user.id,
+            "email": player.user.email,
+            "first_name": player.user.first_name,
+            "last_name": player.user.last_name,
+            "phone": player.user.phone,
+            "role": player.user.role,
+            "is_active": player.user.is_active,
+            "is_verified": player.user.is_verified,
+            "created_at": player.user.created_at,
+            "updated_at": player.user.updated_at
+        },
+        "team_name": team.name if team else None,
+        "parents": [
+            {
+                "id": p.id,
+                "email": p.email,
+                "first_name": p.first_name,
+                "last_name": p.last_name,
+                "phone": p.phone
+            }
+            for p in parents
+        ]
+    }
