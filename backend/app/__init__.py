@@ -1,0 +1,1 @@
+# Handball Manager Backend Application
