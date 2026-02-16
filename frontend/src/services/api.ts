@@ -1,7 +1,12 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { User, UserLogin, UserRegister, TokenResponse } from '@/types';
+import mockApi from './mockApi';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Check if we should use mock API (in dev mode or if backend is not available)
+const isDev = import.meta.env.DEV;
+let useMockApi = isDev;
 
 class ApiService {
   private client: AxiosInstance;
@@ -13,6 +18,7 @@ class ApiService {
       headers: {
         'Content-Type': 'application/json',
       },
+      timeout: 5000, // 5 second timeout
     });
 
     // Request interceptor
@@ -59,8 +65,31 @@ class ApiService {
     );
   }
 
+  async checkBackend(): Promise<boolean> {
+    if (!useMockApi) return true;
+    try {
+      await this.client.get('/health', { timeout: 2000 });
+      useMockApi = false;
+      return true;
+    } catch {
+      useMockApi = true;
+      return false;
+    }
+  }
+
   // Auth
   async login(credentials: UserLogin): Promise<TokenResponse> {
+    if (useMockApi) {
+      const result = await mockApi.login(credentials.email, credentials.password);
+      if (!result) throw new Error('Login failed');
+      return {
+        access_token: result.access_token,
+        refresh_token: 'mock-refresh-token',
+        token_type: 'bearer',
+        user: result.user,
+      };
+    }
+    
     const formData = new URLSearchParams();
     formData.append('username', credentials.email);
     formData.append('password', credentials.password);
@@ -85,19 +114,51 @@ class ApiService {
   }
 
   async getMe(): Promise<User> {
+    if (useMockApi) {
+      const user = await mockApi.getMe();
+      if (!user) throw new Error('Not authenticated');
+      return user;
+    }
+    
     const response = await this.client.get<User>('/auth/me');
     return response.data;
   }
 
-  // Generic methods
+  // Generic methods with mock fallback
   async get<T>(path: string, params?: Record<string, any>): Promise<T> {
-    const response = await this.client.get<T>(path, { params });
-    return response.data;
+    if (useMockApi) {
+      return mockApi.get(path + (params ? '?' + new URLSearchParams(params).toString() : '')) as Promise<T>;
+    }
+    
+    try {
+      const response = await this.client.get<T>(path, { params });
+      return response.data;
+    } catch (error) {
+      // If request fails, try mock
+      if (isDev) {
+        console.log('Backend unavailable, using mock data');
+        useMockApi = true;
+        return mockApi.get(path) as Promise<T>;
+      }
+      throw error;
+    }
   }
 
   async post<T>(path: string, data?: any): Promise<T> {
-    const response = await this.client.post<T>(path, data);
-    return response.data;
+    if (useMockApi) {
+      return mockApi.post(path, data) as Promise<T>;
+    }
+    
+    try {
+      const response = await this.client.post<T>(path, data);
+      return response.data;
+    } catch (error) {
+      if (isDev) {
+        useMockApi = true;
+        return mockApi.post(path, data) as Promise<T>;
+      }
+      throw error;
+    }
   }
 
   async put<T>(path: string, data?: any): Promise<T> {
@@ -106,11 +167,27 @@ class ApiService {
   }
 
   async patch<T>(path: string, data?: any): Promise<T> {
-    const response = await this.client.patch<T>(path, data);
-    return response.data;
+    if (useMockApi) {
+      return mockApi.patch(path, data) as Promise<T>;
+    }
+    
+    try {
+      const response = await this.client.patch<T>(path, data);
+      return response.data;
+    } catch (error) {
+      if (isDev) {
+        useMockApi = true;
+        return mockApi.patch(path, data) as Promise<T>;
+      }
+      throw error;
+    }
   }
 
   async delete<T>(path: string): Promise<T> {
+    if (useMockApi) {
+      return mockApi.delete(path) as Promise<T>;
+    }
+    
     const response = await this.client.delete<T>(path);
     return response.data;
   }
