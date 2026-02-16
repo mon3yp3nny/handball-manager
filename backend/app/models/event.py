@@ -12,14 +12,21 @@ class EventType(str, enum.Enum):
     OTHER = "other"
 
 
+class EventVisibility(str, enum.Enum):
+    TEAM = "team"
+    CLUB_WIDE = "club_wide"
+    AGE_GROUP = "age_group"
+
+
 class Event(Base):
     __tablename__ = "events"
     
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # Nullable for club-wide events
     event_type = Column(Enum(EventType), default=EventType.TRAINING)
+    visibility = Column(Enum(EventVisibility), default=EventVisibility.TEAM)
     location = Column(String, nullable=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
