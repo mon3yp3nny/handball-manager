@@ -28,6 +28,8 @@ class PlayerBase(BaseModel):
 class PlayerCreate(PlayerBase):
     user_id: int
     team_id: Optional[int] = None
+    parent_ids: Optional[List[int]] = None  # IDs of parents to link
+    create_parents: Optional[List[dict]] = None  # Create new parent users
 
 
 # Update schemas

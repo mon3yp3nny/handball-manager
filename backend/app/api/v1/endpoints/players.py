@@ -53,6 +53,13 @@ def create_player(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_coach)
 ):
+    """Create player with optional parent linking."""
+    from app.models.parent_child import ParentChild
+    from app.models.user import User, UserRole
+    from app.core.security import get_password_hash
+    import secrets
+    import string
+    
     # Check if user exists
     user = db.query(User).filter(User.id == player_data.user_id).first()
     if not user:
@@ -63,8 +70,75 @@ def create_player(
     if existing:
         raise HTTPException(status_code=400, detail="Player profile already exists for this user")
     
-    db_player = Player(**player_data.dict())
+    # Extract parent_ids and create_parents from data
+    parent_ids = player_data.parent_ids or []
+    create_parents = player_data.create_parents or []
+    
+    # Remove from player_data dict before creating player
+    player_dict = player_data.dict(exclude={"parent_ids", "create_parents"}, exclude_unset=True)
+    
+    db_player = Player(**player_dict)
     db.add(db_player)
+    db.flush()  # Get player ID before commit
+    
+    # Create new parent users
+    created_parent_ids = []
+    for parent_data in create_parents:
+        # Generate random password
+        password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+        
+        # Check if user with this email already exists
+        existing_user = db.query(User).filter(User.email == parent_data['email']).first()
+        if existing_user:
+            # If exists and is a parent, link them
+            if existing_user.role == UserRole.PARENT:
+                created_parent_ids.append(existing_user.id)
+                # Send notification
+                print(f"📧 Email sent to {parent_data['email']}: Ihr Kind wurde hinzugefügt")
+            continue
+        
+        # Create new parent user
+        new_parent = User(
+            email=parent_data['email'],
+            first_name=parent_data['first_name'],
+            last_name=parent_data['last_name'],
+            phone=parent_data.get('phone'),
+            role=UserRole.PARENT,
+            hashed_password=get_password_hash(password),
+            is_verified=True
+        )
+        db.add(new_parent)
+        db.flush()
+        created_parent_ids.append(new_parent.id)
+        
+        # TODO: Send email with credentials
+        print(f"""
+        📧 NEW PARENT ACCOUNT
+        To: {parent_data['email']}
+        Subject: Ihr Handball Manager Konto
+        
+        Hallo {parent_data['first_name']},
+        
+        Ein Konto wurde für Sie erstellt. Sie können sich mit folgenden Daten anmelden:
+        
+        Email: {parent_data['email']}
+        Passwort: {password}
+        
+        Bitte ändern Sie Ihr Passwort nach dem ersten Login.
+        """)
+    
+    # Link parents to player
+    all_parent_ids = set(parent_ids + created_parent_ids)
+    for parent_id in all_parent_ids:
+        # Verify parent exists and has PARENT role
+        parent = db.query(User).filter(User.id == parent_id).first()
+        if parent and (parent.role == UserRole.PARENT or parent.role == UserRole.ADMIN):
+            link = ParentChild(parent_id=parent_id, child_id=db_player.id)
+            db.add(link)
+            
+            # Send notification to parent
+            print(f"📧 Parent {parent.email} linked to player {user.first_name} {user.last_name}")
+    
     db.commit()
     db.refresh(db_player)
     return db_player
