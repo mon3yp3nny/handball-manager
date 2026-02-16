@@ -9,9 +9,15 @@ import {
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { useRole } from '@/store/authStore';
+import { ParentDashboard } from './Family/ParentDashboard';
 
 export const DashboardPage = () => {
   const { user, isCoach, isPlayer, isParent } = useRole();
+
+  // Show parent-specific dashboard
+  if (isParent) {
+    return <ParentDashboard />;
+  }
 
   const { data: teamsCount } = useQuery({
     queryKey: ['teams-count'],
