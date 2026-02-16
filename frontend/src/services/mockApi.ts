@@ -277,6 +277,10 @@ const mockApi = {
     if (endpoint.includes('/news')) {
       return { items: mockNews, total: mockNews.length };
     }
+    if (endpoint.includes('/parents/children')) {
+      // Return mock children for Parent (user id 4)
+      return [mockPlayers[0]]; // Lukas Müller as child
+    }
     
     return {};
   },
