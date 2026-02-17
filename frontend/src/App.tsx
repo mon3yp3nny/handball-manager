@@ -44,6 +44,8 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token && !isAuthenticated) {
+      // Skip API validation for dev tokens
+      if (token === 'dev-token') return;
       // Token exists but not in store, try to fetch user
       api.getMe()
         .then((user) => {

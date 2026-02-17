@@ -110,12 +110,14 @@ export const useAuthStore = create<AuthState>(
       devAutoLogin: (role) => {
         if (!isDev || !demoUsers) return;
         const user = demoUsers[role];
+        localStorage.setItem('token', 'dev-token');
         set({ user, token: 'dev-token', isAuthenticated: true, isDevMode: true });
       },
       // Dev role switch
       devSwitchRole: (role) => {
         if (!isDev || !demoUsers) return;
         const user = demoUsers[role];
+        localStorage.setItem('token', 'dev-token');
         set({ user, token: 'dev-token', isAuthenticated: true });
       },
     }),
