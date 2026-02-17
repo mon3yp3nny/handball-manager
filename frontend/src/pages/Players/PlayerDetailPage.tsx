@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { User, Phone, Mail, Shield, Calendar, Trophy, Users, ArrowLeft, UserCircle } from 'lucide-react';
+import { User as UserIcon, Phone, Mail, Shield, Calendar, Trophy, Users, ArrowLeft, UserCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../services/api';
+import { PositionLabels, UserRole } from '@/types';
 
-interface Player {
-  id: number;
-  user_id: number;
-  team_id: number | null;
+// Backend detail response shape — uses server IDs (strings from the API)
+interface PlayerDetailResponse {
+  id: string;
+  user_id: string;
+  team_id: string | null;
   jersey_number: number | null;
   position: string | null;
   date_of_birth: string | null;
@@ -19,18 +21,17 @@ interface Player {
   created_at: string;
   updated_at: string;
   user: {
-    id: number;
+    id: string;
     email: string;
     first_name: string;
     last_name: string;
     phone: string | null;
     role: string;
     is_active: boolean;
-    is_verified: boolean;
   };
   team_name: string | null;
   parents: {
-    id: number;
+    id: string;
     email: string;
     first_name: string;
     last_name: string;
@@ -41,17 +42,18 @@ interface Player {
 export const PlayerDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const [player, setPlayer] = useState<Player | null>(null);
+  const [player, setPlayer] = useState<PlayerDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchPlayer = async () => {
       try {
-        const response = await api.get(`/players/${id}`);
-        setPlayer(response.data);
-      } catch (err: any) {
-        setError(err.response?.data?.detail || 'Fehler beim Laden der Spielerdaten');
+        const response = await api.get<PlayerDetailResponse>(`/players/${id}`);
+        setPlayer(response);
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { detail?: string } } };
+        setError(axiosErr.response?.data?.detail || 'Fehler beim Laden der Spielerdaten');
       } finally {
         setLoading(false);
       }
@@ -84,17 +86,8 @@ export const PlayerDetailPage = () => {
   }
 
   const getPositionLabel = (position: string | null) => {
-    const positions: { [key: string]: string } = {
-      goalkeeper: 'Torwart',
-      left_wing: 'Linksaußen',
-      left_back: 'Rückraum Links',
-      center_back: 'Rückraum Mitte',
-      right_back: 'Rückraum Rechts',
-      right_wing: 'Rechtsaußen',
-      pivot: 'Kreisläufer',
-      defense: 'Deckung',
-    };
-    return position ? positions[position] || position : 'Nicht angegeben';
+    if (!position) return 'Nicht angegeben';
+    return PositionLabels[position as keyof typeof PositionLabels] || position;
   };
 
   const getInitials = () => {
@@ -125,7 +118,7 @@ export const PlayerDetailPage = () => {
             </p>
           </div>
         </div>
-        {(user?.role === 'admin' || user?.role === 'coach') && (
+        {(user?.role === UserRole.ADMIN || user?.role === UserRole.COACH) && (
           <Link
             to={`/players/${id}/edit`}
             className="btn btn-primary"
@@ -139,7 +132,7 @@ export const PlayerDetailPage = () => {
         {/* Profile Information */}
         <div className="card p-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <User className="w-5 h-5 mr-2" />
+            <UserIcon className="w-5 h-5 mr-2" />
             Profilinformationen
           </h2>
           <div className="space-y-4">
@@ -231,7 +224,7 @@ export const PlayerDetailPage = () => {
         </div>
 
         {/* Parents */}
-        {(user?.role === 'admin' || user?.role === 'coach' || user?.id === player.user_id || 
+        {(user?.role === UserRole.ADMIN || user?.role === UserRole.COACH || user?.id === player.user_id ||
           player.parents.some(p => p.id === user?.id)) && (
           <div className="card p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center">
@@ -268,7 +261,7 @@ export const PlayerDetailPage = () => {
                 ))}
               </div>
             )}
-            {(user?.role === 'admin' || user?.role === 'coach') && (
+            {(user?.role === UserRole.ADMIN || user?.role === UserRole.COACH) && (
               <div className="mt-4">
                 <button className="btn btn-secondary w-full">
                   Elternteil hinzufügen

@@ -47,7 +47,7 @@ export interface OAuthLoginResponse {
   token_type: string;
   user_id: string;
   email: string;
-  role: string;
+  role: UserRole;
   first_name: string;
   last_name: string;
   is_new_user: boolean;
@@ -88,7 +88,7 @@ export const PositionLabels: Record<Position, string> = {
   [Position.GOALKEEPER]: 'Torwart',
   [Position.LEFT_WING]: 'Linksaußen',
   [Position.LEFT_BACK]: 'Rückraum Links',
-  [Position.CENTER_BACK]: 'Kreisläufer',
+  [Position.CENTER_BACK]: 'Rückraum Mitte',
   [Position.RIGHT_BACK]: 'Rückraum Rechts',
   [Position.RIGHT_WING]: 'Rechtsaußen',
   [Position.PIVOT]: 'Kreisläufer',
@@ -158,7 +158,7 @@ export interface Game {
   location: string;
   scheduled_at: string;
   game_type?: GameType;
-  status: GameStatus | string;
+  status: GameStatus;
   home_score?: number | null;
   away_score?: number | null;
   is_home_game?: boolean;
@@ -202,8 +202,8 @@ export interface Event {
   description?: string;
   team_id?: string | null;
   team_name?: string;
-  event_type: EventType | string;
-  visibility: EventVisibility | string;
+  event_type: EventType;
+  visibility: EventVisibility;
   age_group?: string;
   location?: string;
   start_time: string;
@@ -236,7 +236,7 @@ export interface Attendance {
   game_id?: string;
   event_id?: string;
   event_name?: string;
-  status: AttendanceStatus | string;
+  status: AttendanceStatus;
   notes?: string;
   recorded_by?: string;
   recorded_at: string;

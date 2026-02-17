@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, UserRole, Team, CalendarEvent } from '@/types';
+import { User, UserRole, Team, AppNotification } from '@/types';
 
 // Demo users for development - only available in dev builds
 const demoUsers: Record<UserRole, User> | null = import.meta.env.DEV
@@ -83,8 +83,8 @@ interface UIState {
 }
 
 interface NotificationState {
-  notifications: CalendarEvent[];
-  addNotification: (notification: CalendarEvent) => void;
+  notifications: AppNotification[];
+  addNotification: (notification: AppNotification) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
 }
@@ -98,10 +98,14 @@ export const useAuthStore = create<AuthState>(
       isAuthenticated: false,
       token: null,
       isDevMode: isDev,
-      setUser: (user) => set({ user }),
+      setUser: (user) => set({ user, isAuthenticated: !!user }),
       setToken: (token) => set({ token, isAuthenticated: !!token }),
       setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      logout: () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        set({ user: null, token: null, isAuthenticated: false });
+      },
       // Dev auto-login
       devAutoLogin: (role) => {
         if (!isDev || !demoUsers) return;
@@ -112,7 +116,7 @@ export const useAuthStore = create<AuthState>(
       devSwitchRole: (role) => {
         if (!isDev || !demoUsers) return;
         const user = demoUsers[role];
-        set({ user });
+        set({ user, token: 'dev-token', isAuthenticated: true });
       },
     }),
     {
