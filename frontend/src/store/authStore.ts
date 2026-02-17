@@ -121,6 +121,11 @@ export const useAuthStore = create<AuthState>(
     }),
     {
       name: 'auth-storage',
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<AuthState>),
+        isDevMode: isDev,
+      }),
     }
   )
 );
