@@ -141,7 +141,7 @@ class ApiService {
   }
 
   // Generic methods with mock fallback
-  async get<T>(path: string, params?: Record<string, any>): Promise<T> {
+  async get<T>(path: string, params?: Record<string, string>): Promise<T> {
     if (useMockApi) {
       return mockApi.get(path + (params ? '?' + new URLSearchParams(params).toString() : '')) as Promise<T>;
     }
@@ -160,7 +160,7 @@ class ApiService {
     }
   }
 
-  async post<T>(path: string, data?: any): Promise<T> {
+  async post<T>(path: string, data?: unknown): Promise<T> {
     if (useMockApi) {
       return mockApi.post(path, data) as Promise<T>;
     }
@@ -177,12 +177,12 @@ class ApiService {
     }
   }
 
-  async put<T>(path: string, data?: any): Promise<T> {
+  async put<T>(path: string, data?: unknown): Promise<T> {
     const response = await this.client.put<T>(path, data);
     return response.data;
   }
 
-  async patch<T>(path: string, data?: any): Promise<T> {
+  async patch<T>(path: string, data?: unknown): Promise<T> {
     if (useMockApi) {
       return mockApi.patch(path, data) as Promise<T>;
     }

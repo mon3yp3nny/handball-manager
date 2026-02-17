@@ -1,19 +1,18 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
-import { Team, Player } from '@/types';
+import { TeamWithPlayers } from '@/types';
 
 export const TeamDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  
-  const { data: team, isLoading } = useQuery({
+
+  const { data: team, isLoading, isError } = useQuery({
     queryKey: ['team', id],
-    queryFn: async () => {
-      return await api.get(`/teams/${id}`) as Team & { players: Player[] };
-    },
+    queryFn: () => api.get<TeamWithPlayers>(`/teams/${id}`),
   });
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Mannschaft</div>;
   if (!team) return <div>Mannschaft nicht gefunden</div>;
 
   return (

@@ -1,4 +1,4 @@
-import { User, UserRole, Team, Player, Game, Event, News, Attendance } from '@/types';
+import { User, UserRole, Team, Player, Game, Event, News, Attendance, GameStatus, EventType, EventVisibility } from '@/types';
 
 // Mock data for development without backend
 const mockUsers: User[] = [
@@ -144,7 +144,7 @@ const mockGames: Game[] = [
     location: 'Sporthalle Mitte, Hamburg',
     home_score: 28,
     away_score: 24,
-    status: 'completed',
+    status: GameStatus.COMPLETED,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-02-20T21:00:00Z',
   },
@@ -158,7 +158,7 @@ const mockGames: Game[] = [
     location: 'Sporthalle Ost, Berlin',
     home_score: null,
     away_score: null,
-    status: 'scheduled',
+    status: GameStatus.SCHEDULED,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
   },
@@ -172,7 +172,7 @@ const mockGames: Game[] = [
     location: 'Jugendsporthalle Leipzig',
     home_score: null,
     away_score: null,
-    status: 'scheduled',
+    status: GameStatus.SCHEDULED,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
   },
@@ -186,7 +186,7 @@ const mockGames: Game[] = [
     location: 'Sporthalle Mitte, Hamburg',
     home_score: null,
     away_score: null,
-    status: 'scheduled',
+    status: GameStatus.SCHEDULED,
     created_at: '2024-01-15T10:00:00Z',
     updated_at: '2024-01-15T10:00:00Z',
   },
@@ -200,7 +200,8 @@ const mockEvents: Event[] = [
     start_time: '2024-02-18T18:00:00Z',
     end_time: '2024-02-18T20:00:00Z',
     location: 'Sporthalle Mitte',
-    event_type: 'training',
+    event_type: EventType.TRAINING,
+    visibility: EventVisibility.TEAM,
     team_id: '1',
     created_by: '2',
     created_at: '2024-01-15T10:00:00Z',
@@ -213,7 +214,8 @@ const mockEvents: Event[] = [
     start_time: '2024-02-22T19:00:00Z',
     end_time: '2024-02-22T21:00:00Z',
     location: 'Vereinsheim',
-    event_type: 'meeting',
+    event_type: EventType.MEETING,
+    visibility: EventVisibility.CLUB,
     team_id: null,
     created_by: '1',
     created_at: '2024-01-15T10:00:00Z',
@@ -226,7 +228,8 @@ const mockEvents: Event[] = [
     start_time: '2024-03-02T09:00:00Z',
     end_time: '2024-03-03T18:00:00Z',
     location: 'Sportpark Hamburg',
-    event_type: 'tournament',
+    event_type: EventType.TOURNAMENT,
+    visibility: EventVisibility.CLUB,
     team_id: '3',
     created_by: '2',
     created_at: '2024-01-15T10:00:00Z',
@@ -259,7 +262,7 @@ const mockNews: News[] = [
 
 // Mock API methods
 const mockApi = {
-  get: async (endpoint: string): Promise<any> => {
+  get: async (endpoint: string): Promise<unknown> => {
     await delay(200); // Simulate network delay
     
     if (endpoint.includes('/teams')) {
@@ -285,17 +288,19 @@ const mockApi = {
     return {};
   },
   
-  post: async (endpoint: string, data: any): Promise<any> => {
+  post: async (endpoint: string, data: unknown): Promise<unknown> => {
     await delay(200);
-    return { success: true, ...data, id: Math.random().toString() };
+    const obj = typeof data === 'object' && data !== null ? data : {};
+    return { success: true, ...obj, id: Math.random().toString() };
   },
   
-  patch: async (endpoint: string, data: any): Promise<any> => {
+  patch: async (endpoint: string, data: unknown): Promise<unknown> => {
     await delay(200);
-    return { success: true, ...data };
+    const obj = typeof data === 'object' && data !== null ? data : {};
+    return { success: true, ...obj };
   },
   
-  delete: async (endpoint: string): Promise<any> => {
+  delete: async (endpoint: string): Promise<unknown> => {
     await delay(200);
     return { success: true };
   },

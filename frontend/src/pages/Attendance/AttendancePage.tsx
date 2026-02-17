@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck } from 'lucide-react';
 import { api } from '@/services/api';
-import { Attendance } from '@/types';
+import { Attendance, AttendanceStatus, AttendanceStatusLabels } from '@/types';
 
 export const AttendancePage = () => {
-  const { data: records, isLoading } = useQuery({
+  const { data: records, isLoading, isError } = useQuery({
     queryKey: ['attendance'],
     queryFn: async () => {
       const res = await api.get('/attendance?limit=100');
@@ -12,16 +12,17 @@ export const AttendancePage = () => {
     },
   });
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: AttendanceStatus) => {
     switch (status) {
-      case 'present': return 'badge-green';
-      case 'absent': return 'badge-red';
-      case 'excused': return 'badge-yellow';
+      case AttendanceStatus.PRESENT: return 'badge-green';
+      case AttendanceStatus.ABSENT: return 'badge-red';
+      case AttendanceStatus.EXCUSED: return 'badge-yellow';
       default: return 'badge-blue';
     }
   };
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Anwesenheitsdaten</div>;
 
   return (
     <div>
@@ -48,7 +49,7 @@ export const AttendancePage = () => {
                 <td className="px-6 py-4 whitespace-nowrap font-medium">{record.player_name}</td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`badge ${getStatusColor(record.status)}`}>
-                    {record.status}
+                    {AttendanceStatusLabels[record.status]}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-500">{record.notes || '-'}</td>

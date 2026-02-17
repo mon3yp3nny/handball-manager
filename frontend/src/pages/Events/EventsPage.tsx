@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Calendar } from 'lucide-react';
 import { api } from '@/services/api';
-import { Event } from '@/types';
+import { Event, EventType, EventTypeLabels } from '@/types';
 
 export const EventsPage = () => {
-  const { data: events, isLoading } = useQuery({
+  const { data: events, isLoading, isError } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
       const res = await api.get('/events?limit=100');
@@ -13,6 +13,7 @@ export const EventsPage = () => {
   });
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Termine</div>;
 
   return (
     <div>
@@ -35,11 +36,11 @@ export const EventsPage = () => {
               
               <div className="text-right">
                 <span className={`badge${
-                  event.event_type === 'training' ? '-blue' :
-                  event.event_type === 'meeting' ? '-yellow' :
-                  event.event_type === 'tournament' ? '-green' : ''
+                  event.event_type === EventType.TRAINING ? '-blue' :
+                  event.event_type === EventType.MEETING ? '-yellow' :
+                  event.event_type === EventType.TOURNAMENT ? '-green' : ''
                 }`}>
-                  {event.event_type}
+                  {EventTypeLabels[event.event_type]}
                 </span>
                 <p className="text-sm text-gray-500 mt-2">
                   {new Date(event.start_time).toLocaleString('de-DE')}

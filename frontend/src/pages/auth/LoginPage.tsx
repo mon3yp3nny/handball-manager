@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider, CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/hooks/useAuth';
 import { UserLogin, UserRole } from '@/types';
 import { useAuthStore, roleLabels } from '@/store/authStore';
@@ -35,64 +35,68 @@ export const LoginPage = () => {
     navigate('/');
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setIsOAuthLoading(true);
     try {
-      const result = await api.oauthLogin('google', credentialResponse.credential);
-      
+      const result = await api.oauthLogin('google', credentialResponse.credential ?? '');
+
       // Store tokens
       localStorage.setItem('token', result.access_token);
       localStorage.setItem('refreshToken', result.refresh_token);
-      
+
       if (result.needs_role_selection) {
         // Show role selection modal
         setNewUserEmail(result.email);
         setNeedsRoleSelection(true);
       } else {
         // Complete login
-        setAuth(result.access_token, {
+        setAuth({
           id: result.user_id,
           email: result.email,
           first_name: result.first_name,
           last_name: result.last_name,
-          role: result.role as UserRole,
-        });
+          role: result.role,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        }, result.access_token);
         navigate('/');
         toast.success(`Willkommen, ${result.first_name}!`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
     } finally {
       setIsOAuthLoading(false);
     }
   };
 
-  const handleAppleSuccess = async (event: any) => {
+  const handleAppleSuccess = async (event: { detail: { authorization: { id_token: string } } }) => {
     // Apple Sign In success handler
     // Apple returns a different structure, handle accordingly
     setIsOAuthLoading(true);
     try {
       const { authorization } = event.detail;
       const result = await api.oauthLogin('apple', authorization.id_token);
-      
+
       localStorage.setItem('token', result.access_token);
       localStorage.setItem('refreshToken', result.refresh_token);
-      
+
       if (result.needs_role_selection) {
         setNewUserEmail(result.email);
         setNeedsRoleSelection(true);
       } else {
-        setAuth(result.access_token, {
+        setAuth({
           id: result.user_id,
           email: result.email,
           first_name: result.first_name,
           last_name: result.last_name,
-          role: result.role as UserRole,
-        });
+          role: result.role,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        }, result.access_token);
         navigate('/');
         toast.success(`Willkommen, ${result.first_name}!`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Apple-Anmeldung fehlgeschlagen.');
     } finally {
       setIsOAuthLoading(false);

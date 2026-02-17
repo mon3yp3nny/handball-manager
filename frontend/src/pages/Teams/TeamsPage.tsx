@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Shield, Users, ChevronRight } from 'lucide-react';
 import { api } from '@/services/api';
@@ -12,7 +13,7 @@ export const TeamsPage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTeam, setNewTeam] = useState({ name: '', description: '', age_group: '' });
 
-  const { data: teams, isLoading } = useQuery({
+  const { data: teams, isLoading, isError } = useQuery({
     queryKey: ['teams'],
     queryFn: async () => {
       const res = await api.get('/teams?limit=100');
@@ -58,7 +59,9 @@ export const TeamsPage = () => {
         )}
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-center py-12 text-red-600">Fehler beim Laden der Mannschaften</div>
+      ) : isLoading ? (
         <div className="text-center py-12">Lädt...</div>
       ) : teams?.length === 0 ? (
         <div className="card p-12 text-center">
@@ -68,9 +71,9 @@ export const TeamsPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams?.map((team: Team) => (
-            <a
+            <Link
               key={team.id}
-              href={`/teams/${team.id}`}
+              to={`/teams/${team.id}`}
               className="card p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
@@ -97,7 +100,7 @@ export const TeamsPage = () => {
               {team.description && (
                 <p className="mt-2 text-sm text-gray-500 line-clamp-2">{team.description}</p>
               )}
-            </a>
+            </Link>
           ))}
         </div>
       )}

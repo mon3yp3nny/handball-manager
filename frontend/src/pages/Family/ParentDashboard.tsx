@@ -6,7 +6,13 @@ import { Calendar, Users, Trophy } from 'lucide-react';
 
 export const ParentDashboard = () => {
   const { user } = useAuthStore();
-  const { data: children, isLoading } = useMyChildren();
+  const { data: children, isLoading, isError } = useMyChildren();
+
+  if (isError) {
+    return (
+      <div className="text-center py-12 text-red-600">Fehler beim Laden der Daten</div>
+    );
+  }
 
   if (isLoading) {
     return (
