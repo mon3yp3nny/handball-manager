@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, Bell, User as UserIcon, X } from 'lucide-react';
 import { useRole, useAuthStore } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
@@ -42,14 +43,14 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
               <p className="text-sm text-gray-500">{user?.email}</p>
             </div>
             
-            <a
-              href="/profile"
+            <Link
+              to="/profile"
               className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100"
               onClick={() => setShowProfile(false)}
             >
               <UserIcon className="w-4 h-4 mr-2" />
               Profil
-            </a>
+            </Link>
             
             <button
               onClick={() => {

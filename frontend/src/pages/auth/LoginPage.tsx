@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleLogin, GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleLogin, GoogleOAuthProvider, CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/hooks/useAuth';
 import { UserLogin, UserRole } from '@/types';
 import { useAuthStore, roleLabels } from '@/store/authStore';
@@ -35,64 +35,77 @@ export const LoginPage = () => {
     navigate('/');
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setIsOAuthLoading(true);
     try {
-      const result = await api.oauthLogin('google', credentialResponse.credential);
-      
+      const result = await api.oauthLogin('google', credentialResponse.credential ?? '');
+
       // Store tokens
       localStorage.setItem('token', result.access_token);
       localStorage.setItem('refreshToken', result.refresh_token);
-      
+
       if (result.needs_role_selection) {
         // Show role selection modal
         setNewUserEmail(result.email);
         setNeedsRoleSelection(true);
       } else {
         // Complete login
-        setAuth(result.access_token, {
+        setAuth({
           id: result.user_id,
           email: result.email,
           first_name: result.first_name,
           last_name: result.last_name,
-          role: result.role as UserRole,
-        });
+          role: result.role,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        }, result.access_token);
         navigate('/');
         toast.success(`Willkommen, ${result.first_name}!`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Anmeldung fehlgeschlagen. Bitte versuche es erneut.');
     } finally {
       setIsOAuthLoading(false);
     }
   };
 
-  const handleAppleSuccess = async (event: any) => {
-    // Apple Sign In success handler
-    // Apple returns a different structure, handle accordingly
+  const handleAppleSignIn = async () => {
     setIsOAuthLoading(true);
     try {
-      const { authorization } = event.detail;
-      const result = await api.oauthLogin('apple', authorization.id_token);
-      
+      AppleID.auth.init({
+        clientId: appleClientId,
+        scope: 'name email',
+        redirectURI: window.location.origin,
+        usePopup: true,
+      });
+
+      const response = await AppleID.auth.signIn();
+      const idToken = response.authorization.id_token;
+      const firstName = response.user?.name?.firstName;
+      const lastName = response.user?.name?.lastName;
+
+      const result = await api.oauthLogin('apple', idToken, firstName, lastName);
+
       localStorage.setItem('token', result.access_token);
       localStorage.setItem('refreshToken', result.refresh_token);
-      
+
       if (result.needs_role_selection) {
         setNewUserEmail(result.email);
         setNeedsRoleSelection(true);
       } else {
-        setAuth(result.access_token, {
+        setAuth({
           id: result.user_id,
           email: result.email,
           first_name: result.first_name,
           last_name: result.last_name,
-          role: result.role as UserRole,
-        });
+          role: result.role,
+          is_active: true,
+          created_at: new Date().toISOString(),
+        }, result.access_token);
         navigate('/');
         toast.success(`Willkommen, ${result.first_name}!`);
       }
-    } catch (error) {
+    } catch {
       toast.error('Apple-Anmeldung fehlgeschlagen.');
     } finally {
       setIsOAuthLoading(false);
@@ -111,8 +124,9 @@ export const LoginPage = () => {
 
   const roles = Object.values(UserRole);
 
-  // Google Client ID from environment or empty for development
+  // OAuth Client IDs from environment
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+  const appleClientId = import.meta.env.VITE_APPLE_CLIENT_ID || '';
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -145,19 +159,18 @@ export const LoginPage = () => {
             )}
             
             {/* Apple Sign In Button */}
-            <button
-              onClick={() => {
-                // Apple Sign In (would be implemented with Apple JS SDK)
-                toast.info('Apple Anmeldung wird geladen...');
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-              disabled={isOAuthLoading}
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.2-.93 3.52-.84 1.55.1 2.68.67 3.44 1.65-2.88 1.68-2.24 5.98.22 7.13-.34 1.48-.84 2.9-1.26 4.23zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-              </svg>
-              <span>Mit Apple anmelden</span>
-            </button>
+            {appleClientId && (
+              <button
+                onClick={handleAppleSignIn}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                disabled={isOAuthLoading}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.2-.93 3.52-.84 1.55.1 2.68.67 3.44 1.65-2.88 1.68-2.24 5.98.22 7.13-.34 1.48-.84 2.9-1.26 4.23zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                </svg>
+                <span>Mit Apple anmelden</span>
+              </button>
+            )}
           </div>
           
           <div className="relative mb-6">

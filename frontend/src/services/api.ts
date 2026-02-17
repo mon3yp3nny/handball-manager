@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, UserLogin, UserRegister, TokenResponse } from '@/types';
+import { User, UserLogin, UserRegister, TokenResponse, OAuthLoginResponse, UserRole } from '@/types';
 // Only import mock API in development - Vite tree-shakes this in production
 import mockApi from './mockApi';
 
@@ -37,9 +37,10 @@ class ApiService {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        const originalRequest = error.config;
-        
-        if (error.response?.status === 401 && originalRequest) {
+        const originalRequest = error.config as typeof error.config & { _retry?: boolean };
+
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          originalRequest._retry = true;
           // Try to refresh token
           const refreshToken = localStorage.getItem('refreshToken');
           if (refreshToken) {
@@ -117,7 +118,7 @@ class ApiService {
     return response.data;
   }
 
-  async setOAuthRole(role: string): Promise<void> {
+  async setOAuthRole(role: UserRole): Promise<void> {
     await this.client.post('/oauth/set-role', { role });
   }
 
@@ -140,7 +141,7 @@ class ApiService {
   }
 
   // Generic methods with mock fallback
-  async get<T>(path: string, params?: Record<string, any>): Promise<T> {
+  async get<T>(path: string, params?: Record<string, string>): Promise<T> {
     if (useMockApi) {
       return mockApi.get(path + (params ? '?' + new URLSearchParams(params).toString() : '')) as Promise<T>;
     }
@@ -159,7 +160,7 @@ class ApiService {
     }
   }
 
-  async post<T>(path: string, data?: any): Promise<T> {
+  async post<T>(path: string, data?: unknown): Promise<T> {
     if (useMockApi) {
       return mockApi.post(path, data) as Promise<T>;
     }
@@ -176,12 +177,12 @@ class ApiService {
     }
   }
 
-  async put<T>(path: string, data?: any): Promise<T> {
+  async put<T>(path: string, data?: unknown): Promise<T> {
     const response = await this.client.put<T>(path, data);
     return response.data;
   }
 
-  async patch<T>(path: string, data?: any): Promise<T> {
+  async patch<T>(path: string, data?: unknown): Promise<T> {
     if (useMockApi) {
       return mockApi.patch(path, data) as Promise<T>;
     }

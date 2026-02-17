@@ -4,7 +4,7 @@ import { api } from '@/services/api';
 import { News } from '@/types';
 
 export const NewsPage = () => {
-  const { data: news, isLoading } = useQuery({
+  const { data: news, isLoading, isError } = useQuery({
     queryKey: ['news'],
     queryFn: async () => {
       const res = await api.get('/news?limit=20');
@@ -13,6 +13,7 @@ export const NewsPage = () => {
   });
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Nachrichten</div>;
 
   return (
     <div>

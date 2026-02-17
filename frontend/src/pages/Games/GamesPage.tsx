@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Trophy } from 'lucide-react';
 import { api } from '@/services/api';
-import { Game } from '@/types';
+import { Game, GameStatus } from '@/types';
 
 export const GamesPage = () => {
-  const { data: games, isLoading } = useQuery({
+  const { data: games, isLoading, isError } = useQuery({
     queryKey: ['games'],
     queryFn: async () => {
       const res = await api.get('/games?limit=100');
@@ -13,6 +13,7 @@ export const GamesPage = () => {
   });
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Spiele</div>;
 
   return (
     <div>
@@ -37,14 +38,14 @@ export const GamesPage = () => {
               </div>
               
               <div className="text-right">
-                {game.status === 'completed' ? (
+                {game.status === GameStatus.COMPLETED ? (
                   <p className="font-bold text-gray-900">
                     {game.home_score} : {game.away_score}
                   </p>
                 ) : (
                   <span className={`badge${
-                    game.status === 'scheduled' ? '-blue' : 
-                    game.status === 'cancelled' ? '-red' : '-yellow'
+                    game.status === GameStatus.SCHEDULED ? '-blue' :
+                    game.status === GameStatus.CANCELLED ? '-red' : '-yellow'
                   }`}>
                     {game.status}
                   </span>

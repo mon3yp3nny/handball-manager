@@ -4,7 +4,7 @@ import { api } from '@/services/api';
 import { Player } from '@/types';
 
 export const PlayersPage = () => {
-  const { data: players, isLoading } = useQuery({
+  const { data: players, isLoading, isError } = useQuery({
     queryKey: ['players'],
     queryFn: async () => {
       const res = await api.get('/players?limit=100');
@@ -13,6 +13,7 @@ export const PlayersPage = () => {
   });
 
   if (isLoading) return <div>Lädt...</div>;
+  if (isError) return <div className="text-center py-12 text-red-600">Fehler beim Laden der Spieler</div>;
 
   return (
     <div>

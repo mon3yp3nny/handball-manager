@@ -1,47 +1,51 @@
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Users, 
-  Trophy, 
-  Calendar, 
+import {
+  Users,
+  Trophy,
+  Calendar,
   ClipboardCheck,
   TrendingUp,
   Activity
 } from 'lucide-react';
 import { api } from '@/services/api';
 import { useRole } from '@/store/authStore';
+import { Game, Event } from '@/types';
 import { ParentDashboard } from './Family/ParentDashboard';
 
 export const DashboardPage = () => {
   const { user, isCoach, isPlayer, isParent } = useRole();
 
-  // Show parent-specific dashboard
-  if (isParent) {
-    return <ParentDashboard />;
-  }
-
   const { data: teamsCount } = useQuery({
     queryKey: ['teams-count'],
     queryFn: async () => {
-      const res = await api.get('/teams?limit=1');
+      const res = await api.get<{ total?: number }>('/teams?limit=1');
       return res.total || 0;
     },
+    enabled: !isParent,
   });
 
   const { data: upcomingGames } = useQuery({
     queryKey: ['upcoming-games'],
     queryFn: async () => {
-      const res = await api.get('/games?upcoming=true&limit=5');
+      const res = await api.get<{ items?: Game[] }>('/games?upcoming=true&limit=5');
       return res.items || [];
     },
+    enabled: !isParent,
   });
 
   const { data: upcomingEvents } = useQuery({
     queryKey: ['upcoming-events'],
     queryFn: async () => {
-      const res = await api.get('/events?upcoming=true&limit=5');
+      const res = await api.get<{ items?: Event[] }>('/events?upcoming=true&limit=5');
       return res.items || [];
     },
+    enabled: !isParent,
   });
+
+  // Show parent-specific dashboard (after all hooks)
+  if (isParent) {
+    return <ParentDashboard />;
+  }
 
   const stats = [
     { label: 'Mannschaften', value: teamsCount || 0, icon: Users, color: 'bg-blue-500' },
@@ -85,9 +89,9 @@ export const DashboardPage = () => {
             <h2 className="text-lg font-semibold text-gray-900">Kommende Spiele</h2>
           </div>
           <div className="p-4">
-            {upcomingGames?.length > 0 ? (
+            {(upcomingGames?.length ?? 0) > 0 ? (
               <div className="space-y-3">
-                {upcomingGames.map((game: any) => (
+                {upcomingGames!.map((game: Game) => (
                   <div key={game.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900">
@@ -115,9 +119,9 @@ export const DashboardPage = () => {
             <h2 className="text-lg font-semibold text-gray-900">Kommende Termine</h2>
           </div>
           <div className="p-4">
-            {upcomingEvents?.length > 0 ? (
+            {(upcomingEvents?.length ?? 0) > 0 ? (
               <div className="space-y-3">
-                {upcomingEvents.map((event: any) => (
+                {upcomingEvents!.map((event: Event) => (
                   <div key={event.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div>
                       <p className="font-medium text-gray-900">{event.title}</p>

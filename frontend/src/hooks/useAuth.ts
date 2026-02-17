@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AxiosError } from 'axios';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { UserLogin, User } from '@/types';
@@ -22,8 +23,13 @@ export const useAuth = () => {
     onSuccess: () => {
       toast.success('Willkommen zurück!');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Anmeldung fehlgeschlagen');
+    onError: (error: Error) => {
+      let message = 'Anmeldung fehlgeschlagen';
+      if (error instanceof AxiosError && error.response?.data) {
+        const data = error.response.data as Record<string, string>;
+        if (data.detail) message = data.detail;
+      }
+      toast.error(message);
     },
   });
 

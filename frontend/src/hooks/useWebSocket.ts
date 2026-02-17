@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 
 type WebSocketMessage = {
   type: string;
-  data?: any;
+  data?: unknown;
 };
 
 export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) => {
@@ -30,7 +30,13 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       };
 
       ws.current.onmessage = (event) => {
-        const message = JSON.parse(event.data);
+        let message: WebSocketMessage;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          console.error('WebSocket: invalid JSON received');
+          return;
+        }
         console.log('WebSocket message:', message);
         
         if (message.type === 'error') {
@@ -78,11 +84,11 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
     }
   }, []);
 
-  const subscribeToTeam = useCallback((teamId: number) => {
+  const subscribeToTeam = useCallback((teamId: string) => {
     send({ action: 'subscribe_team', team_id: teamId });
   }, [send]);
 
-  const unsubscribeFromTeam = useCallback((teamId: number) => {
+  const unsubscribeFromTeam = useCallback((teamId: string) => {
     send({ action: 'unsubscribe_team', team_id });
   }, [send]);
 
