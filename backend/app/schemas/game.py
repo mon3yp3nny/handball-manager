@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -20,12 +20,12 @@ class GameType(str, Enum):
 
 # Base schemas
 class GameBase(BaseModel):
-    opponent: str
-    location: str
+    opponent: str = Field(..., min_length=1, max_length=200)
+    location: str = Field(..., min_length=1, max_length=300)
     scheduled_at: datetime
     game_type: GameType = GameType.LEAGUE
     is_home_game: bool = True
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 # Create schemas
@@ -35,20 +35,20 @@ class GameCreate(GameBase):
 
 # Update schemas
 class GameUpdate(BaseModel):
-    opponent: Optional[str] = None
-    location: Optional[str] = None
+    opponent: Optional[str] = Field(None, min_length=1, max_length=200)
+    location: Optional[str] = Field(None, min_length=1, max_length=300)
     scheduled_at: Optional[datetime] = None
     game_type: Optional[GameType] = None
     status: Optional[GameStatus] = None
-    home_score: Optional[int] = None
-    away_score: Optional[int] = None
+    home_score: Optional[int] = Field(None, ge=0)
+    away_score: Optional[int] = Field(None, ge=0)
     is_home_game: Optional[bool] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
 
 
 class GameResultUpdate(BaseModel):
-    home_score: int
-    away_score: int
+    home_score: int = Field(..., ge=0)
+    away_score: int = Field(..., ge=0)
     status: GameStatus = GameStatus.COMPLETED
 
 
@@ -61,13 +61,13 @@ class GameResponse(GameBase):
     away_score: Optional[int]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class GameWithTeam(GameResponse):
     team_name: Optional[str] = None
-    
+
     class Config:
         from_attributes = True

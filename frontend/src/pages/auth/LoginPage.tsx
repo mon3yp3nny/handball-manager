@@ -203,10 +203,12 @@ export const LoginPage = () => {
             </button>
           </form>
           
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Demo-Zugangsdaten:</p>
-            <p>admin@handball.de / admin123</p>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-6 text-center text-sm text-gray-500">
+              <p>Demo-Zugangsdaten:</p>
+              <p>admin@handball.de / admin123</p>
+            </div>
+          )}
         </div>
 
         {/* Role Selection Modal */}

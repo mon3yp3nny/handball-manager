@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -14,7 +14,7 @@ class AttendanceStatus(str, Enum):
 # Base schemas
 class AttendanceBase(BaseModel):
     status: AttendanceStatus = AttendanceStatus.PENDING
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=500)
 
 
 # Create schemas
@@ -27,7 +27,7 @@ class AttendanceCreate(AttendanceBase):
 # Update schemas
 class AttendanceUpdate(BaseModel):
     status: Optional[AttendanceStatus] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=500)
 
 
 # Response schemas
@@ -38,7 +38,7 @@ class AttendanceResponse(AttendanceBase):
     event_id: Optional[int]
     recorded_by: Optional[int]
     recorded_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -46,13 +46,13 @@ class AttendanceResponse(AttendanceBase):
 class AttendanceWithPlayer(AttendanceResponse):
     player_name: Optional[str] = None
     player_jersey: Optional[int] = None
-    
+
     class Config:
         from_attributes = True
 
 
 # Bulk update
 class BulkAttendanceUpdate(BaseModel):
-    player_ids: List[int]
+    player_ids: List[int] = Field(..., min_length=1)
     status: AttendanceStatus
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=500)

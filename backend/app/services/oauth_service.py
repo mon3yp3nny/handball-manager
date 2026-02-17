@@ -1,5 +1,6 @@
 """OAuth service for handling OAuth authentication."""
 import json
+import logging
 import jwt
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -11,6 +12,8 @@ from app.schemas.oauth import OAuthUserInfo
 from app.core.security import create_access_token, create_refresh_token
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 
 def verify_google_token(token: str) -> Optional[OAuthUserInfo]:
     """Verify Google ID token and extract user info."""
@@ -19,18 +22,18 @@ def verify_google_token(token: str) -> Optional[OAuthUserInfo]:
         # For production, use Google's verification endpoint or library
         from google.auth.transport import requests
         from google.oauth2 import id_token
-        
+
         request = requests.Request()
-        
+
         # Verify the token
         idinfo = id_token.verify_oauth2_token(
             token, request, clock_skew_in_seconds=10
         )
-        
+
         # Check issuer
         if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
             return None
-            
+
         return OAuthUserInfo(
             email=idinfo['email'],
             provider='google',
@@ -40,8 +43,11 @@ def verify_google_token(token: str) -> Optional[OAuthUserInfo]:
             picture=idinfo.get('picture'),
             is_verified_email=idinfo.get('email_verified', False)
         )
+    except ValueError as e:
+        logger.error("Google token verification failed (invalid token): %s", e)
+        return None
     except Exception as e:
-        print(f"Google token verification error: {e}")
+        logger.error("Google token verification error: %s", e, exc_info=True)
         return None
 
 
@@ -50,41 +56,41 @@ def verify_apple_token(token: str) -> Optional[OAuthUserInfo]:
     try:
         # Apple's public keys URL
         import requests
-        
+
         # Get Apple's public keys
         apple_keys_url = "https://appleid.apple.com/auth/keys"
         response = requests.get(apple_keys_url)
         keys = response.json()['keys']
-        
+
         # Find the correct key
         unverified_header = jwt.get_unverified_header(token)
         key_id = unverified_header['kid']
-        
+
         apple_key = None
         for key in keys:
             if key['kid'] == key_id:
                 apple_key = key
                 break
-        
+
         if not apple_key:
             return None
-        
+
         # Construct the public key
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.backends import default_backend
-        
+
         # Build RSA public key from JWK
         from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicNumbers
-        
+
         def base64url_to_int(data):
             import base64
             return int.from_bytes(base64.urlsafe_b64decode(data + '=='), 'big')
-        
+
         n = base64url_to_int(apple_key['n'])
         e = base64url_to_int(apple_key['e'])
-        
+
         public_key = RSAPublicNumbers(e, n).public_key(default_backend())
-        
+
         # Verify and decode token
         payload = jwt.decode(
             token,
@@ -93,7 +99,7 @@ def verify_apple_token(token: str) -> Optional[OAuthUserInfo]:
             audience=settings.APPLE_CLIENT_ID if hasattr(settings, 'APPLE_CLIENT_ID') else None,
             issuer='https://appleid.apple.com'
         )
-        
+
         return OAuthUserInfo(
             email=payload['email'],
             provider='apple',
@@ -103,17 +109,23 @@ def verify_apple_token(token: str) -> Optional[OAuthUserInfo]:
             picture=None,
             is_verified_email=payload.get('email_verified', False)
         )
+    except jwt.PyJWTError as e:
+        logger.error("Apple token JWT verification failed: %s", e)
+        return None
+    except (KeyError, requests.RequestException) as e:
+        logger.error("Apple token verification error: %s", e, exc_info=True)
+        return None
     except Exception as e:
-        print(f"Apple token verification error: {e}")
+        logger.error("Unexpected error during Apple token verification: %s", e, exc_info=True)
         return None
 
 
 class OAuthService:
     """Service for OAuth authentication."""
-    
+
     @staticmethod
     def get_or_create_user(
-        db: Session, 
+        db: Session,
         oauth_info: OAuthUserInfo
     ) -> tuple[User, bool]:
         """
@@ -125,19 +137,19 @@ class OAuthService:
             OAuthAccount.provider == OAuthProvider(oauth_info.provider),
             OAuthAccount.provider_account_id == oauth_info.provider_account_id
         ).first()
-        
+
         if existing_oauth:
             # Update provider email if changed
             if existing_oauth.provider_email != oauth_info.email:
                 existing_oauth.provider_email = oauth_info.email
                 db.commit()
             return existing_oauth.user, False
-        
+
         # Check if user exists with same email
         existing_user = db.query(User).filter(
             User.email == oauth_info.email
         ).first()
-        
+
         if existing_user:
             # Link OAuth account to existing user
             oauth_account = OAuthAccount(
@@ -153,7 +165,7 @@ class OAuthService:
             db.add(oauth_account)
             db.commit()
             return existing_user, False
-        
+
         # Create new user
         new_user = User(
             email=oauth_info.email,
@@ -165,7 +177,7 @@ class OAuthService:
         )
         db.add(new_user)
         db.flush()
-        
+
         # Create OAuth account
         oauth_account = OAuthAccount(
             user_id=new_user.id,
@@ -179,9 +191,9 @@ class OAuthService:
         )
         db.add(oauth_account)
         db.commit()
-        
+
         return new_user, True
-    
+
     @staticmethod
     def create_tokens(user: User) -> Dict[str, str]:
         """Create access and refresh tokens for user."""
@@ -190,10 +202,10 @@ class OAuthService:
             "email": user.email,
             "role": user.role.value
         }
-        
+
         access_token = create_access_token(token_data)
         refresh_token = create_refresh_token(token_data)
-        
+
         return {
             "access_token": access_token,
             "refresh_token": refresh_token

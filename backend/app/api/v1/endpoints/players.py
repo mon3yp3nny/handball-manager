@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -7,6 +8,8 @@ from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.team import Team
 from app.schemas.player import PlayerCreate, PlayerUpdate, PlayerResponse, PlayerWithStats
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -20,7 +23,7 @@ def get_players(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Player).join(User, Player.user_id == User.id)
-    
+
     # Role-based filtering
     if current_user.role == UserRole.PLAYER:
         # Players see themselves and teammates
@@ -39,10 +42,10 @@ def get_players(
         # Coaches see players in their teams
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         query = query.filter(Player.team_id.in_(coach_team_ids))
-    
+
     if team_id:
         query = query.filter(Player.team_id == team_id)
-    
+
     players = query.offset(skip).limit(limit).all()
     return players
 
@@ -59,44 +62,46 @@ def create_player(
     from app.core.security import get_password_hash
     import secrets
     import string
-    
+
     # Check if user exists
     user = db.query(User).filter(User.id == player_data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Check if player profile already exists
     existing = db.query(Player).filter(Player.user_id == player_data.user_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="Player profile already exists for this user")
-    
+
     # Extract parent_ids and create_parents from data
     parent_ids = player_data.parent_ids or []
     create_parents = player_data.create_parents or []
-    
+
     # Remove from player_data dict before creating player
     player_dict = player_data.dict(exclude={"parent_ids", "create_parents"}, exclude_unset=True)
-    
+
     db_player = Player(**player_dict)
     db.add(db_player)
     db.flush()  # Get player ID before commit
-    
+
     # Create new parent users
     created_parent_ids = []
     for parent_data in create_parents:
         # Generate random password
         password = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
-        
+
         # Check if user with this email already exists
         existing_user = db.query(User).filter(User.email == parent_data['email']).first()
         if existing_user:
             # If exists and is a parent, link them
             if existing_user.role == UserRole.PARENT:
                 created_parent_ids.append(existing_user.id)
-                # Send notification
-                print(f"📧 Email sent to {parent_data['email']}: Ihr Kind wurde hinzugefügt")
+                logger.info(
+                    "Existing parent email=%s linked to new player user_id=%s",
+                    parent_data['email'], player_data.user_id,
+                )
             continue
-        
+
         # Create new parent user
         new_parent = User(
             email=parent_data['email'],
@@ -110,23 +115,13 @@ def create_player(
         db.add(new_parent)
         db.flush()
         created_parent_ids.append(new_parent.id)
-        
-        # TODO: Send email with credentials
-        print(f"""
-        📧 NEW PARENT ACCOUNT
-        To: {parent_data['email']}
-        Subject: Ihr Handball Manager Konto
-        
-        Hallo {parent_data['first_name']},
-        
-        Ein Konto wurde für Sie erstellt. Sie können sich mit folgenden Daten anmelden:
-        
-        Email: {parent_data['email']}
-        Passwort: {password}
-        
-        Bitte ändern Sie Ihr Passwort nach dem ersten Login.
-        """)
-    
+
+        # TODO: Send email with credentials via email service
+        logger.info(
+            "New parent account created email=%s for player user_id=%s",
+            parent_data['email'], player_data.user_id,
+        )
+
     # Link parents to player
     all_parent_ids = set(parent_ids + created_parent_ids)
     for parent_id in all_parent_ids:
@@ -135,10 +130,11 @@ def create_player(
         if parent and (parent.role == UserRole.PARENT or parent.role == UserRole.ADMIN):
             link = ParentChild(parent_id=parent_id, child_id=db_player.id)
             db.add(link)
-            
-            # Send notification to parent
-            print(f"📧 Parent {parent.email} linked to player {user.first_name} {user.last_name}")
-    
+            logger.info(
+                "Parent user_id=%s linked to player user_id=%s",
+                parent_id, user.id,
+            )
+
     db.commit()
     db.refresh(db_player)
     return db_player
@@ -153,7 +149,7 @@ def get_player(
     player = db.query(Player).filter(Player.id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
-    
+
     # Authorization check
     if current_user.role == UserRole.PLAYER:
         # Can see themselves and teammates
@@ -168,13 +164,14 @@ def get_player(
             child_team_ids = [db.query(Player.team_id).filter(Player.id == cid).scalar() for cid in child_ids]
             if player.team_id not in child_team_ids:
                 raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     # Load team name and parents
+    from app.models.parent_child import ParentChild
     team = db.query(Team).filter(Team.id == player.team_id).first()
     parents = db.query(User).join(
         ParentChild, ParentChild.parent_id == User.id
     ).filter(ParentChild.child_id == player_id).all()
-    
+
     player_data = {
         "id": player.id,
         "user_id": player.user_id,
@@ -213,7 +210,7 @@ def get_player(
             for p in parents
         ]
     }
-    
+
     return player_data
 
 
@@ -227,7 +224,7 @@ def update_player(
     player = db.query(Player).filter(Player.id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
-    
+
     # Authorization
     if current_user.role == UserRole.PLAYER:
         # Players can only update their own info (limited)
@@ -244,10 +241,10 @@ def update_player(
         update_data = player_data.dict(exclude_unset=True)
     else:
         update_data = player_data.dict(exclude_unset=True)
-    
+
     for field, value in update_data.items():
         setattr(player, field, value)
-    
+
     db.commit()
     db.refresh(player)
     return player
@@ -262,7 +259,7 @@ def delete_player(
     player = db.query(Player).filter(Player.id == player_id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
-    
+
     db.delete(player)
     db.commit()
     return {"message": "Player deleted"}
@@ -276,20 +273,20 @@ def get_player_children(
 ):
     """Get linked children (for parent-child relationship)"""
     from app.models.parent_child import ParentChild
-    
+
     # Check if current user is parent of this player
     parent_rel = db.query(ParentChild).filter(
         ParentChild.child_id == player_id,
         ParentChild.parent_id == current_user.id
     ).first()
-    
+
     if not parent_rel and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized")
-    
+
     children = db.query(Player).join(
         ParentChild, ParentChild.child_id == Player.id
     ).filter(ParentChild.parent_id == current_user.id).all()
-    
+
     return children
 
 
@@ -302,27 +299,27 @@ def get_my_schedule(
     from app.models.game import Game
     from app.models.event import Event
     from datetime import datetime
-    
+
     if current_user.role != UserRole.PLAYER:
         raise HTTPException(status_code=403, detail="Only players can access this endpoint")
-    
+
     player = db.query(Player).filter(Player.user_id == current_user.id).first()
     if not player or not player.team_id:
         raise HTTPException(status_code=404, detail="Player or team not found")
-    
+
     # Get upcoming games
     now = datetime.utcnow()
     games = db.query(Game).filter(
         Game.team_id == player.team_id,
         Game.game_time >= now
     ).order_by(Game.game_time).all()
-    
+
     # Get upcoming training/events
     events = db.query(Event).filter(
         Event.team_id == player.team_id,
         Event.start_time >= now
     ).order_by(Event.start_time).all()
-    
+
     return {
         "team_id": player.team_id,
         "team_name": player.team.name if player.team else None,
@@ -357,29 +354,31 @@ def update_my_contact_info(
     current_user: User = Depends(get_current_user)
 ):
     """Player can update their own contact info"""
+    from app.models.parent_child import ParentChild
+
     if current_user.role != UserRole.PLAYER:
         raise HTTPException(status_code=403, detail="Only players can use this endpoint")
-    
+
     player = db.query(Player).filter(Player.user_id == current_user.id).first()
     if not player:
         raise HTTPException(status_code=404, detail="Player profile not found")
-    
+
     # Players can only update certain fields
     allowed_fields = ['emergency_contact_name', 'emergency_contact_phone', 'jersey_number']
     update_data = player_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         if field in allowed_fields:
             setattr(player, field, value)
-    
+
     db.commit()
     db.refresh(player)
-    
+
     # Return in the same format as get_player
     team = db.query(Team).filter(Team.id == player.team_id).first()
     parents = db.query(User).join(
         ParentChild, ParentChild.parent_id == User.id
     ).filter(ParentChild.child_id == player.id).all()
-    
+
     return {
         "id": player.id,
         "user_id": player.user_id,

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
@@ -17,11 +17,13 @@ class Position(str, Enum):
 
 # Base schemas
 class PlayerBase(BaseModel):
-    jersey_number: Optional[int] = None
+    jersey_number: Optional[int] = Field(None, ge=1, le=99)
     position: Optional[Position] = None
     date_of_birth: Optional[date] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = Field(None, max_length=200)
+    emergency_contact_phone: Optional[str] = Field(
+        None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$"
+    )
 
 
 # Create schemas
@@ -34,11 +36,13 @@ class PlayerCreate(PlayerBase):
 
 # Update schemas
 class PlayerUpdate(BaseModel):
-    jersey_number: Optional[int] = None
+    jersey_number: Optional[int] = Field(None, ge=1, le=99)
     position: Optional[Position] = None
     date_of_birth: Optional[date] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = Field(None, max_length=200)
+    emergency_contact_phone: Optional[str] = Field(
+        None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$"
+    )
     team_id: Optional[int] = None
 
 
@@ -53,15 +57,7 @@ class PlayerResponse(PlayerBase):
     created_at: datetime
     updated_at: datetime
     user: Optional["UserBase"] = None
-    
-    class Config:
-        from_attributes = True
 
-
-class PlayerWithStats(PlayerResponse):
-    team_name: Optional[str] = None
-    parents: List["ParentInfo"] = []
-    
     class Config:
         from_attributes = True
 
@@ -72,7 +68,12 @@ class ParentInfo(BaseModel):
     first_name: str
     last_name: str
     phone: Optional[str] = None
-    
+
+
+class PlayerWithStats(PlayerResponse):
+    team_name: Optional[str] = None
+    parents: List[ParentInfo] = []
+
     class Config:
         from_attributes = True
 

@@ -1,12 +1,12 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { User, UserLogin, UserRegister, TokenResponse } from '@/types';
+// Only import mock API in development - Vite tree-shakes this in production
 import mockApi from './mockApi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Check if we should use mock API (in dev mode or if backend is not available)
-const isDev = import.meta.env.DEV;
-let useMockApi = isDev;
+// Mock API fallback is only used in development
+let useMockApi = import.meta.env.DEV;
 
 class ApiService {
   private client: AxiosInstance;
@@ -150,7 +150,7 @@ class ApiService {
       return response.data;
     } catch (error) {
       // If request fails, try mock
-      if (isDev) {
+      if (import.meta.env.DEV) {
         console.log('Backend unavailable, using mock data');
         useMockApi = true;
         return mockApi.get(path) as Promise<T>;
@@ -168,7 +168,7 @@ class ApiService {
       const response = await this.client.post<T>(path, data);
       return response.data;
     } catch (error) {
-      if (isDev) {
+      if (import.meta.env.DEV) {
         useMockApi = true;
         return mockApi.post(path, data) as Promise<T>;
       }
@@ -190,7 +190,7 @@ class ApiService {
       const response = await this.client.patch<T>(path, data);
       return response.data;
     } catch (error) {
-      if (isDev) {
+      if (import.meta.env.DEV) {
         useMockApi = true;
         return mockApi.patch(path, data) as Promise<T>;
       }

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -20,11 +20,11 @@ class EventVisibility(str, Enum):
 
 # Base schemas
 class EventBase(BaseModel):
-    title: str
-    description: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
     event_type: EventType = EventType.TRAINING
     visibility: EventVisibility = EventVisibility.TEAM
-    location: Optional[str] = None
+    location: Optional[str] = Field(None, max_length=300)
     start_time: datetime
     end_time: datetime
 
@@ -36,12 +36,12 @@ class EventCreate(EventBase):
 
 # Update schemas
 class EventUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
     event_type: Optional[EventType] = None
     visibility: Optional[EventVisibility] = None
     team_id: Optional[int] = None
-    location: Optional[str] = None
+    location: Optional[str] = Field(None, max_length=300)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
@@ -52,13 +52,13 @@ class EventResponse(EventBase):
     team_id: Optional[int]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 class EventWithTeam(EventResponse):
     team_name: Optional[str] = None
-    
+
     class Config:
         from_attributes = True

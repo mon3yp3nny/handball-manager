@@ -1,22 +1,21 @@
 # Alembic Migrations
 
-Run migrations with:
+Migrations are managed by Alembic. The `env.py` reads `DATABASE_URL` from the environment automatically.
+
+## Common commands
 
 ```bash
 cd backend
-alembic init alembic
-```
 
-Then configure `alembic.ini`:
-- Set `sqlalchemy.url` to your database URL
-- Update `script_location = alembic`
+# Generate a new migration after model changes
+alembic revision --autogenerate -m "describe your change"
 
-Generate migrations:
-```bash
-alembic revision --autogenerate -m "Initial migration"
-```
-
-Apply migrations:
-```bash
+# Apply all pending migrations
 alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# Show current revision
+alembic current
 ```

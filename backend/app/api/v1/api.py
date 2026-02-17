@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, oauth, users, teams, players, games, events, attendance, news, parents, invitations
+from app.api.v1.endpoints import auth, oauth, users, teams, players, games, events, attendance, news, parents, invitations, health
 
 api_router = APIRouter()
 
@@ -15,3 +15,4 @@ api_router.include_router(events.router, prefix="/events", tags=["Events"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["Attendance"])
 api_router.include_router(news.router, prefix="/news", tags=["News"])
 api_router.include_router(parents.router, prefix="/parents", tags=["Parents"])
+api_router.include_router(health.router, prefix="/health", tags=["Health"])
