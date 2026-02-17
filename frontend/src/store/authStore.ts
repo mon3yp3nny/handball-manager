@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserRole, Team, AppNotification } from '@/types';
 
-// Demo users for development - only available in dev builds
-const demoUsers: Record<UserRole, User> | null = import.meta.env.DEV
+// Demo users for development - available in dev builds or when VITE_DEV_MODE is set
+const demoUsers: Record<UserRole, User> | null = (import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true')
   ? {
       [UserRole.ADMIN]: {
         id: 'admin-1',
