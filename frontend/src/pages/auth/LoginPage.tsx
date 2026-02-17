@@ -69,9 +69,21 @@ export const LoginPage = () => {
     }
   };
 
+  const loadAppleSDK = (): Promise<void> => {
+    if (typeof AppleID !== 'undefined') return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/4/en_US/appleid.auth.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Failed to load Apple Sign In SDK'));
+      document.head.appendChild(script);
+    });
+  };
+
   const handleAppleSignIn = async () => {
     setIsOAuthLoading(true);
     try {
+      await loadAppleSDK();
       AppleID.auth.init({
         clientId: appleClientId,
         scope: 'name email',
