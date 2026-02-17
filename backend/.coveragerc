@@ -1,0 +1,19 @@
+[run]
+source = app
+omit =
+    app/services/email_service.py
+    app/services/oauth_service.py
+    app/core/oauth.py
+    app/api/v1/endpoints/oauth.py
+    app/websocket/*
+    app/core/logging_config.py
+    app/core/permissions.py
+    alembic/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if __name__ == .__main__.
+    pass
+show_missing = true

@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
 
 # Base schemas
 class NewsBase(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., min_length=1, max_length=300)
+    content: str = Field(..., min_length=1, max_length=10000)
     is_published: bool = False
 
 
@@ -17,8 +17,8 @@ class NewsCreate(NewsBase):
 
 # Update schemas
 class NewsUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=300)
+    content: Optional[str] = Field(None, min_length=1, max_length=10000)
     is_published: Optional[bool] = None
 
 
@@ -35,7 +35,7 @@ class NewsResponse(NewsBase):
     published_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -43,6 +43,6 @@ class NewsResponse(NewsBase):
 class NewsWithAuthor(NewsResponse):
     author_name: Optional[str] = None
     team_name: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
