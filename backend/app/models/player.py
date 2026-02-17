@@ -23,7 +23,7 @@ class Player(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
     jersey_number = Column(Integer, nullable=True)
-    position = Column(Enum(Position), nullable=True)
+    position = Column(Enum(Position, name="player_position"), nullable=True)
     date_of_birth = Column(Date, nullable=True)
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)

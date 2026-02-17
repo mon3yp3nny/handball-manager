@@ -342,7 +342,7 @@ def get_my_schedule(
                 "end_time": e.end_time,
                 "location": e.location
             }
-            for e in events if e.event_type == Event.EventType.TRAINING
+            for e in events if e.event_type == "training"
         ][:10],  # Limit to 10
     }
 

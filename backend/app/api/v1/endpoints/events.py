@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_coach_or_supervisor
 from app.models.user import User, UserRole
-from app.models.event import Event, EventType
+from app.models.event import Event, EventType, EventVisibility
 from app.models.team import Team
 from app.models.player import Player
 from app.schemas.event import EventCreate, EventUpdate, EventResponse, EventWithTeam
@@ -19,7 +19,7 @@ def get_events(
     limit: int = Query(100, ge=1, le=1000),
     team_id: Optional[int] = None,
     event_type: Optional[EventType] = None,
-    visibility: Optional[Event.EventVisibility] = None,
+    visibility: Optional[EventVisibility] = None,
     upcoming: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -36,11 +36,11 @@ def get_events(
         # Players see: club-wide events + their own team events
         if my_team_id:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
-                 ((Event.visibility == EventModel.EventVisibility.TEAM) & (Event.team_id == my_team_id)))
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
+                 ((Event.visibility == EventVisibility.TEAM) & (Event.team_id == my_team_id)))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     elif current_user.role == UserRole.PARENT:
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
@@ -51,11 +51,11 @@ def get_events(
         # Parents see: club-wide events + their children's team events
         if child_team_id_list:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
-                 ((Event.visibility == EventModel.EventVisibility.TEAM) & (Event.team_id.in_(child_team_id_list))))
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
+                 ((Event.visibility == EventVisibility.TEAM) & (Event.team_id.in_(child_team_id_list))))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     elif current_user.role == UserRole.COACH:
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         coach_team_id_list = [tid for tid, in db.query(coach_team_ids).all()]
@@ -63,11 +63,11 @@ def get_events(
         # Coaches see: club-wide events + their team events
         if coach_team_id_list:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
                  (Event.team_id.in_(coach_team_id_list)))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     # Admins and Supervisors see all events (no filter)
     
     if team_id:
@@ -95,7 +95,7 @@ def create_event(
     current_user: User = Depends(require_coach)
 ):
     # For team-specific events, verify team exists and user has access
-    if event_data.visibility != Event.EventVisibility.CLUB_WIDE and event_data.team_id:
+    if event_data.visibility != EventVisibility.CLUB_WIDE and event_data.team_id:
         team = db.query(Team).filter(Team.id == event_data.team_id).first()
         if not team:
             raise HTTPException(status_code=404, detail="Team not found")
@@ -104,7 +104,7 @@ def create_event(
         if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
             if current_user.role != UserRole.ADMIN:
                 raise HTTPException(status_code=403, detail="Not authorized")
-    elif event_data.visibility != Event.EventVisibility.CLUB_WIDE and not event_data.team_id:
+    elif event_data.visibility != EventVisibility.CLUB_WIDE and not event_data.team_id:
         # Team-specific events require a team_id
         raise HTTPException(status_code=400, detail="Team-specific events require a team_id")
     
@@ -227,11 +227,11 @@ def get_event_calendar(
         
         if my_team_id:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
-                 ((Event.visibility == EventModel.EventVisibility.TEAM) & (Event.team_id == my_team_id)))
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
+                 ((Event.visibility == EventVisibility.TEAM) & (Event.team_id == my_team_id)))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     elif current_user.role == UserRole.PARENT:
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
@@ -241,22 +241,22 @@ def get_event_calendar(
         
         if child_team_id_list:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
-                 ((Event.visibility == EventModel.EventVisibility.TEAM) & (Event.team_id.in_(child_team_id_list))))
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
+                 ((Event.visibility == EventVisibility.TEAM) & (Event.team_id.in_(child_team_id_list))))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     elif current_user.role == UserRole.COACH:
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         coach_team_id_list = [tid for tid, in db.query(coach_team_ids).all()]
         
         if coach_team_id_list:
             query = query.filter(
-                ((Event.visibility == EventModel.EventVisibility.CLUB_WIDE) | 
+                ((Event.visibility == EventVisibility.CLUB_WIDE) | 
                  (Event.team_id.in_(coach_team_id_list)))
             )
         else:
-            query = query.filter(Event.visibility == EventModel.EventVisibility.CLUB_WIDE)
+            query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
     # Admins and Supervisors see all
     
     events = query.order_by(Event.start_time).all()
