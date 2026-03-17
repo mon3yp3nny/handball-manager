@@ -9,9 +9,9 @@ import toast from 'react-hot-toast';
 
 export const TeamsPage = () => {
   const queryClient = useQueryClient();
-  const { isCoach } = useRole();
+  const { isAdmin } = useRole();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newTeam, setNewTeam] = useState({ name: '', description: '', age_group: '' });
+  const [newTeam, setNewTeam] = useState({ name: '', description: '', age_group: '', coach_id: '' });
 
   const { data: teams, isLoading, isError } = useQuery({
     queryKey: ['teams'],
@@ -21,14 +21,23 @@ export const TeamsPage = () => {
     },
   });
 
+  const { data: coaches } = useQuery({
+    queryKey: ['coaches'],
+    queryFn: async () => {
+      const res = await api.get('/users?role=coach');
+      return res.items || res || [];
+    },
+    enabled: showCreateModal && isAdmin,
+  });
+
   const createTeam = useMutation({
-    mutationFn: async (teamData: { name: string; description: string; age_group: string }) => {
+    mutationFn: async (teamData: { name: string; description: string; age_group: string; coach_id?: number }) => {
       return await api.post('/teams', teamData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
       setShowCreateModal(false);
-      setNewTeam({ name: '', description: '', age_group: '' });
+      setNewTeam({ name: '', description: '', age_group: '', coach_id: '' });
       toast.success('Mannschaft erstellt');
     },
     onError: () => {
@@ -38,7 +47,15 @@ export const TeamsPage = () => {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createTeam.mutate(newTeam);
+    const payload: { name: string; description: string; age_group: string; coach_id?: number } = {
+      name: newTeam.name,
+      description: newTeam.description,
+      age_group: newTeam.age_group,
+    };
+    if (newTeam.coach_id) {
+      payload.coach_id = Number(newTeam.coach_id);
+    }
+    createTeam.mutate(payload);
   };
 
   const ageGroups = ['U8', 'U10', 'U12', 'U14', 'U16', 'U18', 'U20', 'Erwachsene'];
@@ -47,8 +64,8 @@ export const TeamsPage = () => {
     <div>
       <div className="page-header">
         <h1 className="page-title">Mannschaften</h1>
-        
-        {isCoach && (
+
+        {isAdmin && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="btn-primary"
@@ -88,15 +105,15 @@ export const TeamsPage = () => {
                     )}
                   </div>
                 </div>
-                
+
                 <ChevronRight className="w-5 h-5 text-gray-400" />
               </div>
-              
+
               <div className="mt-4 flex items-center text-sm text-gray-500">
                 <Users className="w-4 h-4 mr-1" />
                 {team.player_count || 0} Spieler
               </div>
-              
+
               {team.description && (
                 <p className="mt-2 text-sm text-gray-500 line-clamp-2">{team.description}</p>
               )}
@@ -110,7 +127,7 @@ export const TeamsPage = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Neue Mannschaft</h2>
-            
+
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="label">Name</label>
@@ -123,7 +140,7 @@ export const TeamsPage = () => {
                   placeholder="z.B. 1. Mannschaft"
                 />
               </div>
-              
+
               <div>
                 <label className="label">Altersgruppe</label>
                 <select
@@ -137,7 +154,23 @@ export const TeamsPage = () => {
                   ))}
                 </select>
               </div>
-              
+
+              <div>
+                <label className="label">Trainer</label>
+                <select
+                  value={newTeam.coach_id}
+                  onChange={(e) => setNewTeam({ ...newTeam, coach_id: e.target.value })}
+                  className="input"
+                >
+                  <option value="">-- Trainer auswählen --</option>
+                  {(coaches as any[])?.map((coach: any) => (
+                    <option key={coach.id} value={coach.id}>
+                      {coach.first_name} {coach.last_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="label">Beschreibung</label>
                 <textarea
@@ -147,7 +180,7 @@ export const TeamsPage = () => {
                   rows={3}
                 />
               </div>
-              
+
               <div className="flex justify-end space-x-2">
                 <button
                   type="button"

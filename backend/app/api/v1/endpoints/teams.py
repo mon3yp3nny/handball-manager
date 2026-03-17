@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.core.deps import get_db, get_current_user, require_coach, require_coach_or_supervisor
+from app.core.deps import get_db, get_current_user, require_admin, require_coach, require_coach_or_supervisor
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
@@ -48,8 +48,14 @@ def get_teams(
 def create_team(
     team_data: TeamCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_coach)
+    current_user: User = Depends(require_admin)
 ):
+    # Validate coach_id if provided
+    if team_data.coach_id:
+        coach = db.query(User).filter(User.id == team_data.coach_id, User.role == UserRole.COACH).first()
+        if not coach:
+            raise HTTPException(status_code=400, detail="Invalid coach_id: user not found or not a coach")
+
     db_team = Team(**team_data.dict())
     db.add(db_team)
     db.commit()
@@ -74,21 +80,22 @@ def update_team(
     team_id: int,
     team_data: TeamUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_coach)
+    current_user: User = Depends(require_admin)
 ):
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
-    # Coaches can only update their own teams (unless admin)
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
-        if current_user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=403, detail="Not authorized to update this team")
-    
+
+    # Validate coach_id if being updated
     update_data = team_data.dict(exclude_unset=True)
+    if "coach_id" in update_data and update_data["coach_id"] is not None:
+        coach = db.query(User).filter(User.id == update_data["coach_id"], User.role == UserRole.COACH).first()
+        if not coach:
+            raise HTTPException(status_code=400, detail="Invalid coach_id: user not found or not a coach")
+
     for field, value in update_data.items():
         setattr(team, field, value)
-    
+
     db.commit()
     db.refresh(team)
     return team
@@ -98,16 +105,12 @@ def update_team(
 def delete_team(
     team_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_coach)
+    current_user: User = Depends(require_admin)
 ):
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
-        if current_user.role != UserRole.ADMIN:
-            raise HTTPException(status_code=403, detail="Not authorized to delete this team")
-    
+
     db.delete(team)
     db.commit()
     return {"message": "Team deleted"}
