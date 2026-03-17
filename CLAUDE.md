@@ -11,7 +11,7 @@ Handball Manager is a full-stack club management app for handball teams. It hand
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.11), SQLAlchemy ORM, PostgreSQL 15, Alembic migrations
-- **Frontend:** React 18, TypeScript 5.3, Vite, Tailwind CSS, Zustand (state), Axios (HTTP)
+- **Frontend:** React 18, TypeScript 5.3, Vite, Tailwind CSS, Zustand (state), Axios (HTTP), TanStack Query (server state), react-hook-form (forms)
 - **Auth:** JWT (access 30min / refresh 7 days) + OAuth (Google & Apple)
 - **Real-time:** WebSocket with team-based subscriptions
 - **Deployment:** Docker Compose, Google Cloud Run
@@ -39,6 +39,8 @@ npm run dev        # Vite dev server on port 3000
 npm run build      # production build
 npm run lint       # ESLint
 npm run preview    # preview production build
+npx playwright test                    # run e2e tests (Playwright)
+npx playwright test tests/foo.spec.ts  # single e2e test file
 ```
 
 ### Docker
@@ -64,7 +66,7 @@ Follows a **Model → Schema → Endpoint** pattern per entity:
 ```
 models/       SQLAlchemy ORM models (11 tables)
 schemas/      Pydantic request/response validation
-api/v1/       FastAPI route handlers (13 endpoint modules)
+api/v1/       FastAPI route handlers (12 endpoint modules)
   endpoints/  One file per resource (auth, oauth, teams, players, games, events, attendance, news, invitations, parents, users, health)
   api.py      Aggregates all routers under /api/v1
 core/         Config (pydantic-settings), security (JWT), deps (DI), permissions (RBAC decorators), oauth, rate limiting

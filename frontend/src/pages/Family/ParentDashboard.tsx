@@ -1,6 +1,6 @@
 import { useMyChildren } from '@/hooks/useParent';
 import { useAuthStore } from '@/store/authStore';
-import { PlayerCard } from '@/components/players/PlayerCard';
+
 import { Link } from 'react-router-dom';
 import { Calendar, Users, Trophy } from 'lucide-react';
 

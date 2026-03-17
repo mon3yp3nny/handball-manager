@@ -122,11 +122,12 @@ def create_attendance(
             raise HTTPException(status_code=403, detail="Not authorized")
     
     # Check for existing record
-    existing = db.query(Attendance).filter(
-        Attendance.player_id == attendance_data.player_id,
-        ((Attendance.game_id == attendance_data.game_id) if attendance_data.game_id else True),
-        ((Attendance.event_id == attendance_data.event_id) if attendance_data.event_id else True)
-    ).first()
+    filters = [Attendance.player_id == attendance_data.player_id]
+    if attendance_data.game_id:
+        filters.append(Attendance.game_id == attendance_data.game_id)
+    if attendance_data.event_id:
+        filters.append(Attendance.event_id == attendance_data.event_id)
+    existing = db.query(Attendance).filter(*filters).first()
     
     if existing:
         raise HTTPException(status_code=400, detail="Attendance record already exists")
@@ -224,11 +225,12 @@ def bulk_update_attendance(
     updated_records = []
     
     for player_id in bulk_data.player_ids:
-        record = db.query(Attendance).filter(
-            Attendance.player_id == player_id,
-            ((Attendance.game_id == game_id) if game_id else True),
-            ((Attendance.event_id == event_id) if event_id else True)
-        ).first()
+        filters = [Attendance.player_id == player_id]
+        if game_id:
+            filters.append(Attendance.game_id == game_id)
+        if event_id:
+            filters.append(Attendance.event_id == event_id)
+        record = db.query(Attendance).filter(*filters).first()
         
         if record:
             record.status = bulk_data.status
