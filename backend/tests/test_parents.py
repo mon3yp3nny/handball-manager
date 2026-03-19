@@ -136,6 +136,6 @@ class TestParentDataIsolation:
         resp = client.get("/api/v1/players/", headers=parent_headers)
         assert resp.status_code == 200
         # Parent sees children + teammates in the same team
-        player_ids = [p["id"] for p in resp.json()]
+        player_ids = [p["id"] for p in resp.json()["items"]]
         # The linked child should be visible
         assert player_profile.id in player_ids

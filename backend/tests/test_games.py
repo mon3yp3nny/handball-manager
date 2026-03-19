@@ -8,12 +8,12 @@ class TestGetGames:
     def test_admin_lists_games(self, client, admin_headers, game):
         resp = client.get("/api/v1/games/", headers=admin_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) >= 1
+        assert len(resp.json()["items"]) >= 1
 
     def test_filter_by_team(self, client, coach_headers, game, team):
         resp = client.get(f"/api/v1/games/?team_id={team.id}", headers=coach_headers)
         assert resp.status_code == 200
-        for g in resp.json():
+        for g in resp.json()["items"]:
             assert g["team_id"] == team.id
 
     def test_unauthenticated(self, client):

@@ -8,13 +8,13 @@ class TestGetTeams:
     def test_admin_sees_all_teams(self, client, admin_headers, team):
         resp = client.get("/api/v1/teams/", headers=admin_headers)
         assert resp.status_code == 200
-        names = [t["name"] for t in resp.json()]
+        names = [t["name"] for t in resp.json()["items"]]
         assert team.name in names
 
     def test_coach_sees_own_teams(self, client, coach_headers, team):
         resp = client.get("/api/v1/teams/", headers=coach_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) >= 1
+        assert len(resp.json()["items"]) >= 1
 
     def test_unauthenticated(self, client):
         resp = client.get("/api/v1/teams/")

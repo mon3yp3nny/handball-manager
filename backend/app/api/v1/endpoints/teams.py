@@ -25,7 +25,7 @@ def get_teams(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Team)
-    
+
     # Filter by role
     if current_user.has_role(UserRole.PLAYER):
         # Players see only their team
@@ -41,16 +41,13 @@ def get_teams(
     elif current_user.has_role(UserRole.COACH):
         # Coaches see teams they manage
         query = query.filter(Team.coach_id == current_user.id)
-    
+
     if age_group:
         query = query.filter(Team.age_group == age_group)
-    
-    # Get total count for pagination
+
     total = query.count()
-    
-    # Get paginated results
     teams = query.offset(skip).limit(limit).all()
-    
+
     return {
         "items": teams,
         "total": total,
@@ -63,7 +60,7 @@ def get_teams(
 def create_team(
     team_data: TeamCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_coach)
 ):
     # Validate coach_id if provided
     if team_data.coach_id:
@@ -84,7 +81,10 @@ def get_team(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    team = db.query(Team).filter(Team.id == team_id).first()
+    from sqlalchemy.orm import joinedload
+    team = db.query(Team).options(
+        joinedload(Team.players).joinedload(Player.user)
+    ).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     return team
@@ -95,11 +95,15 @@ def update_team(
     team_id: int,
     team_data: TeamUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_coach)
 ):
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+
+    # Coaches can only update their own teams
+    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this team")
 
     # Validate coach_id if being updated
     update_data = team_data.dict(exclude_unset=True)
@@ -120,22 +124,23 @@ def update_team(
 def delete_team(
     team_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_coach)
 ):
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    
+
+    # Coaches can only delete their own teams
+    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this team")
+
     # Handle related records before deleting team
-    # Players: remove team association
     db.query(Player).filter(Player.team_id == team_id).update({"team_id": None})
-    
-    # Delete related records
     db.query(Game).filter(Game.team_id == team_id).delete()
     db.query(Event).filter(Event.team_id == team_id).delete()
     db.query(News).filter(News.team_id == team_id).delete()
     db.query(Invitation).filter(Invitation.team_id == team_id).delete()
-    
+
     db.delete(team)
     db.commit()
     return {"message": "Team deleted"}

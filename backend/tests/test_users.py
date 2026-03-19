@@ -7,7 +7,7 @@ class TestGetUsers:
     def test_admin_can_list_users(self, client, admin_headers, admin_user):
         resp = client.get("/api/v1/users/", headers=admin_headers)
         assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
+        assert isinstance(resp.json()["items"], list)
 
     def test_coach_can_list_users(self, client, coach_headers):
         resp = client.get("/api/v1/users/", headers=coach_headers)
@@ -25,7 +25,7 @@ class TestGetUsers:
         _make_user(db, email="another_coach@test.com", role=UserRole.COACH)
         resp = client.get("/api/v1/users/?role=coach", headers=admin_headers)
         assert resp.status_code == 200
-        for u in resp.json():
+        for u in resp.json()["items"]:
             assert u["role"] == "coach"
 
     def test_unauthenticated(self, client):
