@@ -6,6 +6,10 @@ from app.core.deps import get_db, get_current_user, require_admin, require_coach
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
+from app.models.game import Game
+from app.models.event import Event
+from app.models.news import News
+from app.models.invitation import Invitation
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamWithPlayers
 
 router = APIRouter()
@@ -110,7 +114,17 @@ def delete_team(
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-
+    
+    # Handle related records before deleting team
+    # Players: remove team association
+    db.query(Player).filter(Player.team_id == team_id).update({"team_id": None})
+    
+    # Delete related records
+    db.query(Game).filter(Game.team_id == team_id).delete()
+    db.query(Event).filter(Event.team_id == team_id).delete()
+    db.query(News).filter(News.team_id == team_id).delete()
+    db.query(Invitation).filter(Invitation.team_id == team_id).delete()
+    
     db.delete(team)
     db.commit()
     return {"message": "Team deleted"}
