@@ -1,34 +1,41 @@
 """Common pagination schemas."""
-from pydantic import BaseModel
-from typing import List, TypeVar, Generic
-
-
-class PaginationParams(BaseModel):
-    """Query parameters for pagination."""
-    skip: int = 0
-    limit: int = 100
-
-
-class PaginatedResponse(BaseModel):
-    """Base paginated response model."""
-    total: int
-    skip: int
-    limit: int
-    items: list
-    
-    class Config:
-        from_attributes = True
+from pydantic import BaseModel, Field
+from typing import List, Generic, TypeVar
+from datetime import datetime
 
 
 T = TypeVar('T')
 
 
-class PaginatedResponseGeneric(BaseModel, Generic[T]):
-    """Generic paginated response that can be used with any item type."""
+class PaginationParams(BaseModel):
+    """Query parameters for pagination."""
+    skip: int = Field(0, ge=0)
+    limit: int = Field(100, ge=1, le=1000)
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Base paginated response model."""
+    items: List[T]
     total: int
     skip: int
     limit: int
-    items: List[T]
     
     class Config:
         from_attributes = True
+
+
+class DashboardStats(BaseModel):
+    """Dashboard statistics response."""
+    total_teams: int
+    total_players: int
+    total_games: int
+    total_events: int
+    upcoming_games: int
+    upcoming_events: int
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+    status: str
+    version: str
+    timestamp: Optional[datetime] = None

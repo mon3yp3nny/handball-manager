@@ -69,7 +69,8 @@ class ApiService {
   async checkBackend(): Promise<boolean> {
     if (!useMockApi) return true;
     try {
-      await this.client.get('/health', { timeout: 2000 });
+      // Health check should hit /api/v1/health/live (backend health endpoint)
+      await this.client.get('/health/live', { timeout: 2000 });
       useMockApi = false;
       return true;
     } catch {

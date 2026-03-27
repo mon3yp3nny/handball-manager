@@ -1,0 +1,52 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.cloudrun'
+      - '--build-arg'
+      - 'VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app'
+      - '--build-arg'
+      - 'VITE_GOOGLE_CLIENT_ID=${_VITE_GOOGLE_CLIENT_ID}'
+      - '--build-arg'
+      - 'VITE_APPLE_CLIENT_ID=${_VITE_APPLE_CLIENT_ID}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/handball-frontend:latest'
+      - '.'
+    dir: 'frontend'
+
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/handball-frontend:latest'
+    dir: 'frontend'
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'handball-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/handball-frontend:latest'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--max-instances'
+      - '5'
+      - '--memory'
+      - '256Mi'
+      - '--cpu'
+      - '1'
+
+images:
+  - 'gcr.io/$PROJECT_ID/handball-frontend:latest'
+
+substitutions:
+  _VITE_GOOGLE_CLIENT_ID: ""
+  _VITE_APPLE_CLIENT_ID: ""
