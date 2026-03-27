@@ -11,11 +11,12 @@ from app.models.event import Event
 from app.models.news import News
 from app.models.invitation import Invitation
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamWithPlayers
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[TeamResponse])
+@router.get("/", response_model=PaginatedResponse[TeamResponse])
 def get_teams(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -44,8 +45,18 @@ def get_teams(
     if age_group:
         query = query.filter(Team.age_group == age_group)
     
+    # Get total count for pagination
+    total = query.count()
+    
+    # Get paginated results
     teams = query.offset(skip).limit(limit).all()
-    return teams
+    
+    return {
+        "items": teams,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.post("/", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
