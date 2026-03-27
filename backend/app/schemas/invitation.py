@@ -8,7 +8,7 @@ class InvitationCreate(BaseModel):
     email: EmailStr
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    role: str = Field(..., pattern=r"^(player|parent)$")  # 'player' or 'parent'
+    role: str = Field(..., pattern=r"^(player|parent|coach|supervisor)$")  # 'player', 'parent', 'coach', or 'supervisor'
     team_id: Optional[int] = None
 
 

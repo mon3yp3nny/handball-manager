@@ -7,6 +7,7 @@ from app.core import security
 from app.core.deps import get_db, get_current_user, require_admin, require_coach
 from app.models.user import User, UserRole
 from app.models.player import Player
+from app.models.user_activity import UserActivity
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 
 router = APIRouter()
