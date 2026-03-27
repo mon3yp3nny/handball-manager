@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Willkommen beim Handball Manager{% endblock %}
+
+{% block content %}
+<p>Hallo {{ first_name }},</p>
+
+<p>herzlich willkommen beim <strong>Handball Manager</strong>! Ihr Konto wurde erfolgreich erstellt. 🎉</p>
+
+<p>Wir freuen uns, Sie in unserer Vereinsverwaltung begrüßen zu dürfen. Ab sofort haben Sie Zugriff auf:</p>
+
+<ul>
+    <li><strong>Ihr persönliches Dashboard</strong> – Alle wichtigen Informationen auf einen Blick</li>
+    <li><strong>Kalender</strong> – Spiele, Trainings und Events im Überblick</li>
+    <li><strong>Team-Übersicht</strong> – Mitglieder, Kontakte und Statistiken</li>
+    <li><strong>Benachrichtigungen</strong> – Keine wichtigen Updates mehr verpassen</li>
+</ul>
+
+<p style="text-align: center;">
+    <a href="{{ login_link }}" class="button">Zum Handball Manager</a>
+</p>
+
+<hr class="divider">
+
+<div class="info-box">
+    <strong>💡 Tipp:</strong> Speichern Sie den Link zum Handball Manager in Ihren Favoriten, 
+    damit Sie jederzeit schnell darauf zugreifen können.
+</div>
+
+<p>Bei Fragen oder Problemen wenden Sie sich bitte an Ihren Vereinsadministrator.</p>
+
+<p>Wir wünschen Ihnen viel Spaß mit dem Handball Manager!</p>
+
+<p>Mit freundlichen Grüßen,<br>
+<strong>Das Handball Manager Team</strong></p>
+{% endblock %}

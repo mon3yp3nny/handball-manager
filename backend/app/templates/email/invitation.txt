@@ -1,0 +1,15 @@
+Hallo {{ first_name }},
+
+{{ inviter_name }} lädt Sie ein, dem Handball Manager beizutreten!
+
+Ihre Einladungsdetails:
+{% if team_name %}Team: {{ team_name }}{% endif %}
+Rolle: {{ role_display }}
+
+Klicken Sie auf diesen Link, um die Einladung anzunehmen:
+{{ invitation_link }}
+
+Dieser Link ist 7 Tage gültig.
+
+Mit freundlichen Grüßen,
+Das Handball Manager Team

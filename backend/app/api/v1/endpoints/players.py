@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -8,6 +8,7 @@ from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.team import Team
 from app.schemas.player import PlayerCreate, PlayerUpdate, PlayerResponse, PlayerWithStats
+from app.services.email_service import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,9 @@ def get_players(
 
 
 @router.post("/", response_model=PlayerResponse, status_code=status.HTTP_201_CREATED)
-def create_player(
+async def create_player(
     player_data: PlayerCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_coach)
 ):
@@ -100,6 +102,15 @@ def create_player(
                     "Existing parent email=%s linked to new player user_id=%s",
                     parent_data['email'], player_data.user_id,
                 )
+                # Send notification to existing parent
+                team = db.query(Team).filter(Team.id == db_player.team_id).first() if db_player.team_id else None
+                background_tasks.add_task(
+                    email_service.send_child_linked_notification,
+                    to_email=existing_user.email,
+                    parent_name=f"{existing_user.first_name} {existing_user.last_name}",
+                    child_name=f"{user.first_name} {user.last_name}",
+                    team_name=team.name if team else None
+                )
             continue
 
         # Create new parent user
@@ -116,12 +127,32 @@ def create_player(
         db.flush()
         created_parent_ids.append(new_parent.id)
 
-        # TODO: Send email with credentials via email service
+        # Send credentials email to new parent
         logger.info(
             "New parent account created email=%s for player user_id=%s",
             parent_data['email'], player_data.user_id,
         )
-
+        team = db.query(Team).filter(Team.id == db_player.team_id).first() if db_player.team_id else None
+        background_tasks.add_task(
+            email_service.send_parent_credentials_email,
+            to_email=parent_data['email'],
+            first_name=parent_data['first_name'],
+            last_name=parent_data['last_name'],
+            password=password,
+            child_name=f"{user.first_name} {user.last_name}",
+            child_team=team.name if team else "Kein Team zugewiesen",
+            coach_name=f"{current_user.first_name} {current_user.last_name}"
+        )
+            to_email=parent_data['email'],
+            first_name=parent_data['first_name'],
+            last_name=parent_data['last_name'],
+            password=password,
+            child_name=f"{user.first_name} {user.last_name}",
+            child_team=team.name if team else "Kein Team zugewiesen",
+            coach_name=f"{current_user.first_name} {current_user.last_name}"
+        )
+    
+>>>>>>> 07df1fb (feat: Implement production-ready email system)
     # Link parents to player
     all_parent_ids = set(parent_ids + created_parent_ids)
     for parent_id in all_parent_ids:

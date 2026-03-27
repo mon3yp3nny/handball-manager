@@ -1,0 +1,13 @@
+Hallo {{ first_name }},
+
+herzlich willkommen beim Handball Manager! Ihr Konto wurde erfolgreich erstellt.
+
+Wir freuen uns, Sie in unserer Vereinsverwaltung begrüßen zu dürfen.
+
+Greifen Sie jetzt zu:
+{{ login_link }}
+
+Bei Fragen wenden Sie sich bitte an Ihren Vereinsadministrator.
+
+Mit freundlichen Grüßen,
+Das Handball Manager Team
