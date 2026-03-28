@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, List
 
 from app.core import security
 from app.core.config import settings
@@ -46,14 +46,18 @@ def register(
             detail="Email already registered"
         )
     
-    # Create user
+    # Create user with multiple roles
+    roles_list = [r.value for r in user_data.roles] if user_data.roles else [UserRole.PLAYER.value]
+    primary_role = user_data.roles[0] if user_data.roles else UserRole.PLAYER
+    
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         phone=user_data.phone,
-        role=user_data.role,
+        role=primary_role,
+        roles=roles_list,
         is_verified=True
     )
     db.add(db_user)
@@ -61,14 +65,10 @@ def register(
     db.refresh(db_user)
     
     # Create player profile if PLAYER role is in roles
-    if UserRole.PLAYER in user_data.roles:
+    if UserRole.PLAYER.value in roles_list:
         player = Player(user_id=db_user.id)
         db.add(player)
         db.commit()
-    
-    # Set user roles
-    db_user.roles = user_data.roles
-    db.commit()
     
     # Log activity
     from app.models.user_activity import UserActivity, ActivityType
@@ -106,7 +106,7 @@ def login(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     # Include all roles in token
     access_token = security.create_access_token(
-        data={"sub": user.email, "roles": [r.value for r in user.roles]},
+        data={"sub": user.email, "roles": user._get_roles_list()},
         expires_delta=access_token_expires
     )
     refresh_token = security.create_refresh_token(
@@ -116,7 +116,7 @@ def login(
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        roles=user.roles
+        roles=user.roles_list
     )
 
 
@@ -148,16 +148,14 @@ def refresh_token(
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
-        data={"sub": user.email, "role": user.role.value},
+        data={"sub": user.email, "roles": user._get_roles_list()},
         expires_delta=access_token_expires
-    )
-    new_refresh_token = security.create_refresh_token(
-        data={"sub": user.email}
     )
 
     return TokenResponse(
         access_token=access_token,
-        refresh_token=new_refresh_token
+        refresh_token=refresh_token,
+        roles=user.roles_list
     )
 
 
@@ -165,4 +163,65 @@ def refresh_token(
 def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
+    """Get current user info"""
     return current_user
+
+
+@router.post("/change-password")
+def change_password(
+    password_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change password for current user"""
+    old_password = password_data.get("old_password")
+    new_password = password_data.get("new_password")
+    
+    if not old_password or not new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Both old and new passwords are required"
+        )
+    
+    if not security.verify_password(old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect old password"
+        )
+    
+    current_user.hashed_password = security.get_password_hash(new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+def forgot_password(
+    request: Request,
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """Request password reset"""
+    email = data.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is required"
+        )
+    
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Don't reveal if email exists
+        return {"message": "If the email exists, a reset link will be sent"}
+    
+    # Generate reset token
+    reset_token = security.create_access_token(
+        data={"sub": user.email, "type": "password_reset"},
+        expires_delta=timedelta(hours=1)
+    )
+    
+    # TODO: Send email with reset token
+    logger.info("Password reset requested for %s", email)
+    
+    return {"message": "If the email exists, a reset link will be sent"}
