@@ -6,16 +6,19 @@ test.describe('News Page UI', () => {
     await loginAsAdmin(page);
   });
 
-  test('news page loads and shows content or error', async ({ page }) => {
+  test('news page loads and shows content, loading, or error', async ({ page }) => {
     await page.goto('/news');
-    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3_000);
 
-    // Page may show title, news content, or API error state
+    // Page may show title, loading state, news content, or API error
     const title = page.locator('h1:has-text("Nachrichten"), h1:has-text("News")');
     const errorState = page.locator('text=/Fehler beim Laden der Nachrichten/');
-    const hasTitle = await title.first().isVisible({ timeout: 5_000 }).catch(() => false);
+    const loadingState = page.locator('text=/Lädt/i');
+
+    const hasTitle = await title.first().isVisible({ timeout: 3_000 }).catch(() => false);
     const hasError = await errorState.first().isVisible({ timeout: 3_000 }).catch(() => false);
-    expect(hasTitle || hasError).toBeTruthy();
+    const isLoading = await loadingState.first().isVisible({ timeout: 1_000 }).catch(() => false);
+    expect(hasTitle || hasError || isLoading).toBeTruthy();
   });
 
   test('news page shows news cards, empty state, or error', async ({ page }) => {

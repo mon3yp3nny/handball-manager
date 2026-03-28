@@ -42,12 +42,12 @@ test.describe('Profile Page UI', () => {
     await expect(roleField.first()).toBeVisible({ timeout: 5_000 });
   });
 
-  test('profile has avatar with initials', async ({ page }) => {
+  test('profile has avatar with user initials', async ({ page }) => {
     await page.goto('/profile');
     await page.waitForLoadState('networkidle');
 
-    // Avatar is a colored circle with initials — check for rounded-full element with text
-    const avatar = page.locator('[class*="rounded-full"]');
+    // Avatar shows initials "AU" for Admin User
+    const avatar = page.locator('text="AU"');
     await expect(avatar.first()).toBeVisible({ timeout: 5_000 });
   });
 
