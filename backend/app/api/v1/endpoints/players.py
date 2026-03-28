@@ -4,12 +4,16 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_admin
+from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.team import Team
+from app.models.parent_child import ParentChild
 from app.schemas.player import PlayerCreate, PlayerUpdate, PlayerResponse, PlayerWithStats
 from app.schemas.common import PaginatedResponse
 from app.services.email_service import email_service
+import secrets
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,6 @@ def get_players(
             query = query.filter(Player.team_id == current_player.team_id)
     elif current_user.role == UserRole.PARENT:
         # Parents see their children and their teammates
-        from app.models.parent_child import ParentChild
         child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_ids)).subquery()
         query = query.filter(
@@ -67,12 +70,6 @@ async def create_player(
     current_user: User = Depends(require_coach)
 ):
     """Create player with optional parent linking."""
-    from app.models.parent_child import ParentChild
-    from app.models.user import User, UserRole
-    from app.core.security import get_password_hash
-    import secrets
-    import string
-
     # Check if user exists
     user = db.query(User).filter(User.id == player_data.user_id).first()
     if not user:
@@ -151,6 +148,7 @@ async def create_player(
             child_team=team.name if team else "Kein Team zugewiesen",
             coach_name=f"{current_user.first_name} {current_user.last_name}"
         )
+    
     # Link parents to player
     all_parent_ids = set(parent_ids + created_parent_ids)
     for parent_id in all_parent_ids:
@@ -187,7 +185,6 @@ def get_player(
             raise HTTPException(status_code=403, detail="Not authorized")
     elif current_user.role == UserRole.PARENT:
         # Can see their children and children's teammates
-        from app.models.parent_child import ParentChild
         child_ids = [pc.child_id for pc in db.query(ParentChild).filter(ParentChild.parent_id == current_user.id).all()]
         if player.id not in child_ids:
             child_team_ids = [db.query(Player.team_id).filter(Player.id == cid).scalar() for cid in child_ids]
@@ -195,7 +192,6 @@ def get_player(
                 raise HTTPException(status_code=403, detail="Not authorized")
 
     # Load team name and parents
-    from app.models.parent_child import ParentChild
     team = db.query(Team).filter(Team.id == player.team_id).first()
     parents = db.query(User).join(
         ParentChild, ParentChild.parent_id == User.id
@@ -301,8 +297,6 @@ def get_player_children(
     current_user: User = Depends(get_current_user)
 ):
     """Get linked children (for parent-child relationship)"""
-    from app.models.parent_child import ParentChild
-
     # Check if current user is parent of this player
     parent_rel = db.query(ParentChild).filter(
         ParentChild.child_id == player_id,
@@ -383,8 +377,6 @@ def update_my_contact_info(
     current_user: User = Depends(get_current_user)
 ):
     """Player can update their own contact info"""
-    from app.models.parent_child import ParentChild
-
     if current_user.role != UserRole.PLAYER:
         raise HTTPException(status_code=403, detail="Only players can use this endpoint")
 
