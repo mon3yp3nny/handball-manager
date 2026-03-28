@@ -8,6 +8,7 @@ from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.team import Team
 from app.schemas.player import PlayerCreate, PlayerUpdate, PlayerResponse, PlayerWithStats
+from app.schemas.common import PaginatedResponse
 from app.services.email_service import email_service
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/", response_model=List[PlayerResponse])
+@router.get("/", response_model=PaginatedResponse[PlayerResponse])
 def get_players(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -47,8 +48,15 @@ def get_players(
     if team_id:
         query = query.filter(Player.team_id == team_id)
 
+    total = query.count()
     players = query.offset(skip).limit(limit).all()
-    return players
+    
+    return {
+        "items": players,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.post("/", response_model=PlayerResponse, status_code=status.HTTP_201_CREATED)
