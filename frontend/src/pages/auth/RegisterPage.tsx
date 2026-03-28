@@ -11,7 +11,7 @@ interface RegisterForm {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: UserRole;
+  roles: UserRole[];
 }
 
 export const RegisterPage = () => {
@@ -22,7 +22,7 @@ export const RegisterPage = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    role: UserRole.PLAYER,
+    roles: [UserRole.PLAYER],
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -34,6 +34,7 @@ export const RegisterPage = () => {
       await api.register({
         ...form,
         phone: form.phone || undefined,
+        roles: form.roles, // Send as array
       });
       toast.success('Registrierung erfolgreich! Bitte melde dich an.');
       navigate('/login');
@@ -131,16 +132,24 @@ export const RegisterPage = () => {
             </div>
             
             <div>
-              <label className="label">Rolle im Verein *</label>
+              <label className="label">Rollen im Verein *</label>
+              <p className="text-xs text-gray-500 mb-2">Mehrere Rollen möglich</p>
               <div className="space-y-2">
                 {roles.map((role) => (
                   <label key={role.value} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                     <input
-                      type="radio"
-                      name="role"
+                      type="checkbox"
+                      name="roles"
                       value={role.value}
-                      checked={form.role === role.value}
-                      onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+                      checked={form.roles.includes(role.value)}
+                      onChange={(e) => {
+                        const value = e.target.value as UserRole;
+                        if (e.target.checked) {
+                          setForm({ ...form, roles: [...form.roles, value] });
+                        } else {
+                          setForm({ ...form, roles: form.roles.filter(r => r !== value) });
+                        }
+                      }}
                       className="mr-3"
                     />
                     <div>

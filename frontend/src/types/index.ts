@@ -30,7 +30,7 @@ export interface UserRegister {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: UserRole;
+  roles: UserRole[];  // Changed from single role to array
 }
 
 export interface TokenResponse {
