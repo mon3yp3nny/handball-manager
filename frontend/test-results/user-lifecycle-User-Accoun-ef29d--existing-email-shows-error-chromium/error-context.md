@@ -1,0 +1,52 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img [ref=e7]
+    - heading "Handball Manager" [level=1] [ref=e10]
+    - paragraph [ref=e11]: Neues Konto erstellen
+  - generic [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Vorname *
+          - textbox "Vorname *" [ref=e17]: Existing
+        - generic [ref=e18]:
+          - generic [ref=e19]: Nachname *
+          - textbox "Nachname *" [ref=e20]: User
+      - generic [ref=e21]:
+        - generic [ref=e22]: E-Mail *
+        - textbox "E-Mail *" [ref=e23]: existing-1774694289971@example.com
+      - generic [ref=e24]:
+        - generic [ref=e25]: Telefon (optional)
+        - textbox "Telefon (optional)" [ref=e26]:
+          - /placeholder: +49 123 456789
+      - generic [ref=e27]:
+        - generic [ref=e28]: Passwort *
+        - textbox "Passwort *" [active] [ref=e29]: TestPass123!
+        - paragraph [ref=e30]: Mindestens 8 Zeichen
+      - generic [ref=e31]:
+        - generic [ref=e32]: Rolle im Verein *
+        - generic [ref=e33]:
+          - generic [ref=e34] [cursor=pointer]:
+            - radio "Spieler Spieler im Verein" [checked] [ref=e35]
+            - generic [ref=e36]:
+              - generic [ref=e37]: Spieler
+              - generic [ref=e38]: Spieler im Verein
+          - generic [ref=e39] [cursor=pointer]:
+            - radio "Eltern Elternteil eines Spielers" [ref=e40]
+            - generic [ref=e41]:
+              - generic [ref=e42]: Eltern
+              - generic [ref=e43]: Elternteil eines Spielers
+          - generic [ref=e44] [cursor=pointer]:
+            - radio "Trainer Trainer oder Betreuer" [ref=e45]
+            - generic [ref=e46]:
+              - generic [ref=e47]: Trainer
+              - generic [ref=e48]: Trainer oder Betreuer
+      - button "Konto erstellen" [ref=e49] [cursor=pointer]
+    - generic [ref=e50]:
+      - text: Bereits registriert?
+      - link "Hier anmelden" [ref=e51] [cursor=pointer]:
+        - /url: /login
+```

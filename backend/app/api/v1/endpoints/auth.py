@@ -10,7 +10,8 @@ from app.core.config import settings
 from app.core.deps import get_db, get_current_user
 from app.core.rate_limit import limiter
 from app.models.user import User, UserRole
-from app.schemas.user import TokenResponse, LoginRequest, UserResponse
+from app.models.player import Player
+from app.schemas.user import TokenResponse, LoginRequest, UserResponse, UserCreate
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,56 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     if not user.is_active:
         return None
     return user
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
+def register(
+    request: Request,
+    user_data: UserCreate,
+    db: Session = Depends(get_db)
+):
+    """Register a new user (public endpoint)"""
+    # Check if email exists
+    if db.query(User).filter(User.email == user_data.email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create user
+    db_user = User(
+        email=user_data.email,
+        hashed_password=security.get_password_hash(user_data.password),
+        first_name=user_data.first_name,
+        last_name=user_data.last_name,
+        phone=user_data.phone,
+        role=user_data.role,
+        is_verified=True
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # Create player profile if role is PLAYER
+    if user_data.role == UserRole.PLAYER:
+        player = Player(user_id=db_user.id)
+        db.add(player)
+        db.commit()
+    
+    # Log activity
+    from app.models.user_activity import UserActivity, ActivityType
+    activity = UserActivity(
+        user_id=db_user.id,
+        activity_type=ActivityType.CREATED,
+        description="User registered via web"
+    )
+    db.add(activity)
+    db.commit()
+    
+    logger.info("New user registered: user_id=%s, email=%s", db_user.id, db_user.email)
+    
+    return db_user
 
 
 @router.post("/login", response_model=TokenResponse)
