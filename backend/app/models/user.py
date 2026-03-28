@@ -1,9 +1,8 @@
 """User model with OAuth support."""
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum, Text
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
-import json
 from app.db.session import Base
 
 
@@ -24,8 +23,7 @@ class User(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
-    role = Column(Enum(UserRole), default=UserRole.PLAYER, nullable=False)  # Primary role (backward compat)
-    roles_data = Column(Text, nullable=True)  # JSON string of roles
+    role = Column(Enum(UserRole), default=UserRole.PLAYER, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     is_oauth_only = Column(Boolean, default=False)  # True if user only has OAuth login
@@ -40,52 +38,17 @@ class User(Base):
     sent_invitations = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="inviter")
     activities = relationship("UserActivity", back_populates="user", order_by="desc(UserActivity.created_at)")
     
-    def _get_roles_list(self):
-        """Get roles as list of strings."""
-        if not self.roles_data:
-            return [self.role.value] if self.role else [UserRole.PLAYER.value]
-        try:
-            roles = json.loads(self.roles_data)
-            if isinstance(roles, list):
-                return roles
-            return [self.role.value] if self.role else [UserRole.PLAYER.value]
-        except (json.JSONDecodeError, TypeError):
-            return [self.role.value] if self.role else [UserRole.PLAYER.value]
-    
-    @property
-    def roles(self):
-        """Get/set roles as list of strings (for SQLAlchemy compatibility)."""
-        return self._get_roles_list()
-    
-    @roles.setter
-    def roles(self, value):
-        """Set roles from list."""
-        if isinstance(value, list):
-            self.roles_data = json.dumps(value)
-        else:
-            self.roles_data = json.dumps([value]) if value else None
-    
+    # Multi-role support - roles are stored in JWT, primary role in DB
     @property
     def roles_list(self):
-        """Get all roles as list of UserRole enums."""
-        roles_data = self._get_roles_list()
-        result = []
-        for r in roles_data:
-            try:
-                result.append(UserRole(r))
-            except (ValueError, TypeError):
-                pass
-        # Ensure primary role is always included
-        if self.role:
-            if self.role not in result:
-                result.append(self.role)
-        return result
+        """Get all roles as list - for backward compatibility returns single role."""
+        return [self.role]
     
-    def has_role(self, role):
-        """Check if user has specific role."""
-        if isinstance(role, UserRole):
-            return role.value in self._get_roles_list() or role == self.role
-        return role in self._get_roles_list() or role == self.role.value
+    def has_role(self, check_role):
+        """Check if user has specific role - compares with primary role."""
+        if isinstance(check_role, UserRole):
+            return self.role == check_role
+        return self.role.value == check_role
     
     def has_any_role(self, roles):
         """Check if user has any of the specified roles."""
@@ -94,16 +57,3 @@ class User(Base):
     def has_all_roles(self, roles):
         """Check if user has all specified roles."""
         return all(self.has_role(r) for r in roles)
-    
-    def set_roles(self, roles):
-        """Set roles from list of UserRole enums or strings."""
-        role_values = []
-        for r in roles:
-            if isinstance(r, UserRole):
-                role_values.append(r.value)
-            else:
-                role_values.append(r)
-        self.roles = role_values
-        # Update primary role to first one
-        if role_values:
-            self.role = UserRole(role_values[0])

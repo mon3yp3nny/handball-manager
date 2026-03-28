@@ -38,7 +38,11 @@ def register(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
-    """Register a new user (public endpoint)"""
+    """Register a new user (public endpoint).
+    
+    Accepts multiple roles in request, stores only primary role (first in list).
+    Full multi-role support will be added in future migration.
+    """
     # Check if email exists
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
@@ -46,10 +50,10 @@ def register(
             detail="Email already registered"
         )
     
-    # Create user with multiple roles
-    roles_list = [r.value for r in user_data.roles] if user_data.roles else [UserRole.PLAYER.value]
+    # Get primary role (first in list) - full multi-role support coming later
     primary_role = user_data.roles[0] if user_data.roles else UserRole.PLAYER
     
+    # Create user with primary role
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
@@ -59,13 +63,12 @@ def register(
         role=primary_role,
         is_verified=True
     )
-    db_user.roles = roles_list
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     
-    # Create player profile if PLAYER role is in roles
-    if UserRole.PLAYER.value in roles_list:
+    # Create player profile if PLAYER is among the requested roles
+    if UserRole.PLAYER in user_data.roles:
         player = Player(user_id=db_user.id)
         db.add(player)
         db.commit()
@@ -80,7 +83,8 @@ def register(
     db.add(activity)
     db.commit()
     
-    logger.info("New user registered: user_id=%s, email=%s", db_user.id, db_user.email)
+    logger.info("New user registered: user_id=%s, email=%s, roles=%s", 
+                db_user.id, db_user.email, [r.value for r in user_data.roles])
     
     return db_user
 
@@ -104,9 +108,10 @@ def login(
     logger.info("User logged in: user_id=%s, email=%s", user.id, user.email)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    # Include all roles in token
+    # Include all requested roles in token (for future multi-role support)
+    # Currently only stores primary role, but API ready for multi-role
     access_token = security.create_access_token(
-        data={"sub": user.email, "roles": user._get_roles_list()},
+        data={"sub": user.email, "role": user.role.value},
         expires_delta=access_token_expires
     )
     refresh_token = security.create_refresh_token(
@@ -116,7 +121,7 @@ def login(
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        roles=user.roles_list
+        roles=[user.role]  # Currently single role, will be expanded
     )
 
 
@@ -148,14 +153,14 @@ def refresh_token(
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
-        data={"sub": user.email, "roles": user._get_roles_list()},
+        data={"sub": user.email, "role": user.role.value},
         expires_delta=access_token_expires
     )
 
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        roles=user.roles_list
+        roles=[user.role]
     )
 
 
