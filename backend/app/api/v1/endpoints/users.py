@@ -172,7 +172,7 @@ def delete_my_account(
     from app.models.user_activity import UserActivity, ActivityType
     activity = UserActivity(
         user_id=current_user.id,
-        activity_type=ActivityType.ACCOUNT_DELETION,
+        activity_type=ActivityType.DELETED,
         description=f"User account deleted by user ({current_user.email})"
     )
     db.add(activity)

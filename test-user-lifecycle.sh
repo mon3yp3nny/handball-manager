@@ -39,7 +39,8 @@ echo ""
 echo "Step 2: Login user..."
 LOGIN_RESPONSE=$(curl -s -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=$TEST_EMAIL\&password=$TEST_PASSWORD" 2>/dev/null)
+  --data-urlencode "username=$TEST_EMAIL" \
+  --data-urlencode "password=$TEST_PASSWORD" 2>/dev/null)
 
 echo "Response: $LOGIN_RESPONSE"
 echo ""
@@ -80,7 +81,8 @@ echo ""
 echo "Step 5: Verify account is deleted (should fail to login)..."
 LOGIN_AFTER_DELETE=$(curl -s -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=$TEST_EMAIL\&password=$TEST_PASSWORD" \
+  --data-urlencode "username=$TEST_EMAIL" \
+  --data-urlencode "password=$TEST_PASSWORD" \
   -w "\nHTTP_CODE:%{http_code}" 2>/dev/null)
 
 DELETE_HTTP_CODE=$(echo "$LOGIN_AFTER_DELETE" | grep "HTTP_CODE:" | cut -d: -f2)
