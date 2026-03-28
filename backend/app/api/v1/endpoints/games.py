@@ -9,11 +9,12 @@ from app.models.game import Game, GameStatus, GameType
 from app.models.team import Team
 from app.models.player import Player
 from app.schemas.game import GameCreate, GameUpdate, GameResponse, GameWithTeam, GameResultUpdate
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[GameResponse])
+@router.get("/", response_model=PaginatedResponse[GameResponse])
 def get_games(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -51,8 +52,15 @@ def get_games(
         week_later = now + timedelta(days=7)
         query = query.filter(Game.scheduled_at >= now).filter(Game.scheduled_at <= week_later)
     
+    total = query.count()
     games = query.order_by(Game.scheduled_at).offset(skip).limit(limit).all()
-    return games
+    
+    return {
+        "items": games,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.post("/", response_model=GameResponse, status_code=status.HTTP_201_CREATED)

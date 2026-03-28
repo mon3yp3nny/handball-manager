@@ -9,6 +9,7 @@ from app.models.event import Event, EventType, EventVisibility
 from app.models.team import Team
 from app.models.player import Player
 from app.schemas.event import EventCreate, EventUpdate, EventResponse, EventWithTeam
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
