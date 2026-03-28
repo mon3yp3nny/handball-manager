@@ -120,10 +120,10 @@ def get_player_parents(
         raise HTTPException(status_code=404, detail="Player not found")
     
     # Authorization - player can see their own parents, parents their children's parents
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         if player.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         # Check if this is their child
         link = db.query(ParentChild).filter(
             ParentChild.parent_id == current_user.id,

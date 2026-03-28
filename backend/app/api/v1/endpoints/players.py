@@ -31,19 +31,19 @@ def get_players(
     query = db.query(Player).join(User, Player.user_id == User.id)
 
     # Role-based filtering
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         # Players see themselves and teammates
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and current_player.team_id:
             query = query.filter(Player.team_id == current_player.team_id)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         # Parents see their children and their teammates
         child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_ids)).subquery()
         query = query.filter(
             (Player.id.in_(child_ids)) | (Player.team_id.in_(child_team_ids))
         )
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         # Coaches see players in their teams
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         query = query.filter(Player.team_id.in_(coach_team_ids))
@@ -178,12 +178,12 @@ def get_player(
         raise HTTPException(status_code=404, detail="Player not found")
 
     # Authorization check
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         # Can see themselves and teammates
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and player.team_id != current_player.team_id and player.id != current_player.id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         # Can see their children and children's teammates
         child_ids = [pc.child_id for pc in db.query(ParentChild).filter(ParentChild.parent_id == current_user.id).all()]
         if player.id not in child_ids:
@@ -251,13 +251,13 @@ def update_player(
         raise HTTPException(status_code=404, detail="Player not found")
 
     # Authorization
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         # Players can only update their own info (limited)
         if player.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="Not authorized")
         # Players can't change team or stats
         update_data = player_data.dict(exclude_unset=True, exclude={"team_id", "games_played", "goals_scored", "assists"})
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         # Coaches can update their team's players
         team = db.query(Team).filter(Team.id == player.team_id).first()
         if not team or team.coach_id != current_user.id:

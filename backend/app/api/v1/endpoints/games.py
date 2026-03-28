@@ -27,17 +27,17 @@ def get_games(
     query = db.query(Game).join(Team, Game.team_id == Team.id)
     
     # Role-based filtering
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and current_player.team_id:
             query = query.filter(Game.team_id == current_player.team_id)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
         ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
         query = query.filter(Game.team_id.in_(child_team_ids))
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         query = query.filter(Game.team_id.in_(coach_team_ids))
     
@@ -75,7 +75,7 @@ def create_game(
         raise HTTPException(status_code=404, detail="Team not found")
     
     # Coaches can only create games for their teams
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized to create games for this team")
     
@@ -97,11 +97,11 @@ def get_game(
         raise HTTPException(status_code=404, detail="Game not found")
     
     # Authorization check
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and game.team_id != current_player.team_id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
@@ -125,7 +125,7 @@ def update_game(
     
     # Authorization
     team = db.query(Team).filter(Team.id == game.team_id).first()
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized to update this game")
     
@@ -152,7 +152,7 @@ def update_game_result(
     
     # Authorization
     team = db.query(Team).filter(Team.id == game.team_id).first()
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -176,7 +176,7 @@ def delete_game(
         raise HTTPException(status_code=404, detail="Game not found")
     
     team = db.query(Team).filter(Team.id == game.team_id).first()
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -201,17 +201,17 @@ def get_calendar(
     )
     
     # Filter by role
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and current_player.team_id:
             query = query.filter(Game.team_id == current_player.team_id)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
         ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
         query = query.filter(Game.team_id.in_(child_team_ids))
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         query = query.filter(Game.team_id.in_(coach_team_ids))
     

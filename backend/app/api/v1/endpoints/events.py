@@ -30,7 +30,7 @@ def get_events(
     query = db.query(Event)
     
     # Role-based filtering with visibility
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         my_team_id = current_player.team_id if current_player else None
         
@@ -42,7 +42,7 @@ def get_events(
             )
         else:
             query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
@@ -57,7 +57,7 @@ def get_events(
             )
         else:
             query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         coach_team_id_list = [tid for tid, in db.query(coach_team_ids).all()]
         
@@ -102,7 +102,7 @@ def create_event(
             raise HTTPException(status_code=404, detail="Team not found")
         
         # Authorization - coaches must own the team
-        if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+        if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
             if current_user.role != UserRole.ADMIN:
                 raise HTTPException(status_code=403, detail="Not authorized")
     elif event_data.visibility != EventVisibility.CLUB_WIDE and not event_data.team_id:
@@ -134,11 +134,11 @@ def get_event(
         raise HTTPException(status_code=404, detail="Event not found")
     
     # Authorization
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player and event.team_id != current_player.team_id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
@@ -162,7 +162,7 @@ def update_event(
     
     # Authorization
     team = db.query(Team).filter(Team.id == event.team_id).first()
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -195,7 +195,7 @@ def delete_event(
         raise HTTPException(status_code=404, detail="Event not found")
     
     team = db.query(Team).filter(Team.id == event.team_id).first()
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -222,7 +222,7 @@ def get_event_calendar(
     )
     
     # Filter by role with visibility
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         my_team_id = current_player.team_id if current_player else None
         
@@ -233,7 +233,7 @@ def get_event_calendar(
             )
         else:
             query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
@@ -247,7 +247,7 @@ def get_event_calendar(
             )
         else:
             query = query.filter(Event.visibility == EventVisibility.CLUB_WIDE)
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
         coach_team_id_list = [tid for tid, in db.query(coach_team_ids).all()]
         

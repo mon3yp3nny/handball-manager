@@ -60,11 +60,15 @@ def register(
     db.commit()
     db.refresh(db_user)
     
-    # Create player profile if role is PLAYER
-    if user_data.role == UserRole.PLAYER:
+    # Create player profile if PLAYER role is in roles
+    if UserRole.PLAYER in user_data.roles:
         player = Player(user_id=db_user.id)
         db.add(player)
         db.commit()
+    
+    # Set user roles
+    db_user.roles = user_data.roles
+    db.commit()
     
     # Log activity
     from app.models.user_activity import UserActivity, ActivityType
@@ -77,8 +81,6 @@ def register(
     db.commit()
     
     logger.info("New user registered: user_id=%s, email=%s", db_user.id, db_user.email)
-    
-    return db_user
     
     return db_user
 
@@ -102,8 +104,9 @@ def login(
     logger.info("User logged in: user_id=%s, email=%s", user.id, user.email)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Include all roles in token
     access_token = security.create_access_token(
-        data={"sub": user.email, "role": user.role.value},
+        data={"sub": user.email, "roles": [r.value for r in user.roles]},
         expires_delta=access_token_expires
     )
     refresh_token = security.create_refresh_token(
@@ -112,7 +115,8 @@ def login(
 
     return TokenResponse(
         access_token=access_token,
-        refresh_token=refresh_token
+        refresh_token=refresh_token,
+        roles=user.roles
     )
 
 

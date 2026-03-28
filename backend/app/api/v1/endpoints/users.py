@@ -99,7 +99,7 @@ def get_user(
         raise HTTPException(status_code=404, detail="User not found")
     
     # Parents can only see their children and themselves
-    if current_user.role == UserRole.PARENT:
+    if current_user.has_role(UserRole.PARENT):
         if user_id != current_user.id:
             # Check if this user is their child
             from app.models.parent_child import ParentChild

@@ -27,18 +27,18 @@ def get_teams(
     query = db.query(Team)
     
     # Filter by role
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         # Players see only their team
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if player and player.team_id:
             query = query.filter(Team.id == player.team_id)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         # Parents see teams of their children
         from app.models.parent_child import ParentChild
         child_player_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_player_ids)).subquery()
         query = query.filter(Team.id.in_(child_team_ids))
-    elif current_user.role == UserRole.COACH:
+    elif current_user.has_role(UserRole.COACH):
         # Coaches see teams they manage
         query = query.filter(Team.coach_id == current_user.id)
     
@@ -156,7 +156,7 @@ def add_player_to_team(
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     
@@ -181,7 +181,7 @@ def remove_player_from_team(
     if not player:
         raise HTTPException(status_code=404, detail="Player not found")
     
-    if current_user.role == UserRole.COACH and team.coach_id != current_user.id:
+    if current_user.has_role(UserRole.COACH) and team.coach_id != current_user.id:
         if current_user.role != UserRole.ADMIN:
             raise HTTPException(status_code=403, detail="Not authorized")
     

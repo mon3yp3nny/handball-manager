@@ -47,11 +47,25 @@ def get_current_active_user(
 
 
 def require_role(roles: list[UserRole]):
+    """Require user to have ANY of the specified roles."""
     def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role not in roles:
+        # Check if user has any of the required roles
+        if not current_user.has_any_role(roles):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Access denied. Required roles: {[r.value for r in roles]}"
+            )
+        return current_user
+    return role_checker
+
+
+def require_all_roles(roles: list[UserRole]):
+    """Require user to have ALL of the specified roles."""
+    def role_checker(current_user: User = Depends(get_current_user)):
+        if not current_user.has_all_roles(roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required all roles: {[r.value for r in roles]}"
             )
         return current_user
     return role_checker

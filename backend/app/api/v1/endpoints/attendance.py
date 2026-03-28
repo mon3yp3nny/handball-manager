@@ -38,11 +38,11 @@ def get_attendance(
         query = query.filter(Attendance.player_id == player_id)
     
     # Filter by role
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if current_player:
             query = query.filter(Attendance.player_id == current_player.id)
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         query = query.filter(Attendance.player_id.in_(child_ids))
@@ -63,7 +63,7 @@ def initialize_event_attendance(
         raise HTTPException(status_code=404, detail="Event not found")
     
     # Authorization
-    if current_user.role == UserRole.COACH and event.team_id:
+    if current_user.has_role(UserRole.COACH) and event.team_id:
         team = db.query(Team).filter(Team.id == event.team_id).first()
         if not team or team.coach_id != current_user.id:
             if current_user.role != UserRole.ADMIN:
@@ -108,11 +108,11 @@ def create_attendance(
         )
     
     # Verify player belongs to current user or user has permission
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if not player or player.id != attendance_data.player_id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         parent_link = db.query(ParentChild).filter(
             ParentChild.parent_id == current_user.id,
@@ -153,11 +153,11 @@ def get_attendance_record(
         raise HTTPException(status_code=404, detail="Attendance record not found")
     
     # Authorization
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if not player or record.player_id != player.id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         parent_link = db.query(ParentChild).filter(
             ParentChild.parent_id == current_user.id,
@@ -181,14 +181,14 @@ def update_attendance(
         raise HTTPException(status_code=404, detail="Attendance record not found")
     
     # Players can only update their own pending records
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if not player or record.player_id != player.id:
             raise HTTPException(status_code=403, detail="Not authorized")
         # Players can only set status to present/absent, not change once recorded
         if record.status != AttendanceStatus.PENDING:
             raise HTTPException(status_code=400, detail="Cannot modify recorded attendance")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         parent_link = db.query(ParentChild).filter(
             ParentChild.parent_id == current_user.id,
@@ -332,11 +332,11 @@ def get_player_attendance_stats(
 ):
     """Get attendance statistics for a player"""
     # Authorization
-    if current_user.role == UserRole.PLAYER:
+    if current_user.has_role(UserRole.PLAYER):
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if not player or player.id != player_id:
             raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.role == UserRole.PARENT:
+    elif current_user.has_role(UserRole.PARENT):
         from app.models.parent_child import ParentChild
         parent_link = db.query(ParentChild).filter(
             ParentChild.parent_id == current_user.id,
