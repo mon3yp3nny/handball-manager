@@ -1,71 +1,40 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Playwright configuration for E2E testing
- * @see https://playwright.dev/docs/test-configuration
- */
+const API_BASE = process.env.API_BASE_URL ?? 'https://handball-backend-218596927281.europe-west1.run.app';
+const APP_BASE = process.env.APP_BASE_URL ?? 'https://handball-frontend-218596927281.europe-west1.run.app';
+
 export default defineConfig({
   testDir: './e2e',
-  
-  /* Run tests in files in parallel */
-  fullyParallel: true,
-  
-  /* Fail the build on CI if you accidentally left test.only in the source code */
+  globalSetup: './e2e/global-setup.ts',
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
-  
-  /* Opt out of parallel tests on CI */
-  workers: process.env.CI ? 1 : undefined,
-  
-  /* Reporter to use */
+  retries: process.env.CI ? 1 : 0,
+  workers: 1,
   reporter: 'html',
-  
-  /* Shared settings for all the projects below */
+  timeout: 30_000,
   use: {
-    /* Base URL to use in actions like `await page.goto('/')` */
-    baseURL: process.env.FRONTEND_URL || 'https://handball-frontend-218596927281.europe-west1.run.app',
-
-    /* Collect trace when retrying the failed test */
+    baseURL: APP_BASE,
+    extraHTTPHeaders: {
+      'Accept': 'application/json',
+    },
     trace: 'on-first-retry',
-    
-    /* Screenshot on failure */
     screenshot: 'only-on-failure',
   },
-
-  /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: 'api',
+      testDir: './e2e/api',
+      use: {
+        baseURL: API_BASE,
+      },
     },
-
-    // Uncomment to test other browsers
-    // {
-    //   name: 'firefox',
-    //   use: { ...devices['Desktop Firefox'] },
-    // },
-    // {
-    //   name: 'webkit',
-    //   use: { ...devices['Desktop Safari'] },
-    // },
-
-    /* Test against mobile viewports */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
+    {
+      name: 'ui',
+      testDir: './e2e/ui',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: APP_BASE,
+      },
+    },
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://127.0.0.1:5173',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 });
