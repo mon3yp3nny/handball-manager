@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.post("/init")
 def init_database(
-    secret: str,
+    data: dict,
     db: Session = Depends(get_db)
 ):
     """Initialize database with migration and sample data.
@@ -27,6 +27,7 @@ def init_database(
     Requires secret key for protection.
     """
     # Simple protection - in production use proper auth
+    secret = data.get("secret")
     if secret != "init-handball-2024":
         raise HTTPException(status_code=403, detail="Invalid secret")
     
