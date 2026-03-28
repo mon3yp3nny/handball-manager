@@ -57,9 +57,9 @@ def register(
         last_name=user_data.last_name,
         phone=user_data.phone,
         role=primary_role,
-        roles=roles_list,
         is_verified=True
     )
+    db_user.roles = roles_list
     db.add(db_user)
     db.commit()
     db.refresh(db_user)

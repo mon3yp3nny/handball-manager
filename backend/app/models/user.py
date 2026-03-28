@@ -1,8 +1,9 @@
 """User model with OAuth support."""
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum, Text
 from sqlalchemy.orm import relationship, validates
 from datetime import datetime
 import enum
+import json
 from app.db.session import Base
 
 
@@ -24,7 +25,7 @@ class User(Base):
     last_name = Column(String, nullable=False)
     phone = Column(String, nullable=True)
     role = Column(Enum(UserRole), default=UserRole.PLAYER, nullable=False)  # Primary role (backward compat)
-    roles = Column(JSON, default=list)  # Multiple roles as JSON array
+    roles_data = Column(Text, nullable=True)  # JSON string of roles
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     is_oauth_only = Column(Boolean, default=False)  # True if user only has OAuth login
@@ -41,11 +42,28 @@ class User(Base):
     
     def _get_roles_list(self):
         """Get roles as list of strings."""
-        if not self.roles:
+        if not self.roles_data:
             return [self.role.value] if self.role else [UserRole.PLAYER.value]
-        if isinstance(self.roles, list):
-            return self.roles
-        return [self.role.value] if self.role else [UserRole.PLAYER.value]
+        try:
+            roles = json.loads(self.roles_data)
+            if isinstance(roles, list):
+                return roles
+            return [self.role.value] if self.role else [UserRole.PLAYER.value]
+        except (json.JSONDecodeError, TypeError):
+            return [self.role.value] if self.role else [UserRole.PLAYER.value]
+    
+    @property
+    def roles(self):
+        """Get/set roles as list of strings (for SQLAlchemy compatibility)."""
+        return self._get_roles_list()
+    
+    @roles.setter
+    def roles(self, value):
+        """Set roles from list."""
+        if isinstance(value, list):
+            self.roles_data = json.dumps(value)
+        else:
+            self.roles_data = json.dumps([value]) if value else None
     
     @property
     def roles_list(self):
@@ -58,8 +76,9 @@ class User(Base):
             except (ValueError, TypeError):
                 pass
         # Ensure primary role is always included
-        if self.role and self.role not in result:
-            result.append(self.role)
+        if self.role:
+            if self.role not in result:
+                result.append(self.role)
         return result
     
     def has_role(self, role):
