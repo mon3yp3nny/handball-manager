@@ -9,11 +9,12 @@ from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.user_activity import UserActivity
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("/", response_model=PaginatedResponse[UserResponse])
 def get_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -24,8 +25,14 @@ def get_users(
     query = db.query(User)
     if role:
         query = query.filter(User.role == role)
+    total = query.count()
     users = query.offset(skip).limit(limit).all()
-    return users
+    return {
+        "items": users,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from typing import Optional, List
+from typing import Optional
 
 from app.core import security
 from app.core.config import settings
@@ -38,41 +38,33 @@ def register(
     user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
-    """Register a new user (public endpoint).
-    
-    Accepts multiple roles in request, stores only primary role (first in list).
-    Full multi-role support will be added in future migration.
-    """
+    """Register a new user (public endpoint)."""
     # Check if email exists
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
-    # Get primary role (first in list) - full multi-role support coming later
-    primary_role = user_data.roles[0] if user_data.roles else UserRole.PLAYER
-    
-    # Create user with primary role
+
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         phone=user_data.phone,
-        role=primary_role,
+        role=user_data.role,
         is_verified=True
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
-    # Create player profile if PLAYER is among the requested roles
-    if UserRole.PLAYER in user_data.roles:
+
+    # Create player profile if role is PLAYER
+    if user_data.role == UserRole.PLAYER:
         player = Player(user_id=db_user.id)
         db.add(player)
         db.commit()
-    
+
     # Log activity
     from app.models.user_activity import UserActivity, ActivityType
     activity = UserActivity(
@@ -82,10 +74,10 @@ def register(
     )
     db.add(activity)
     db.commit()
-    
-    logger.info("New user registered: user_id=%s, email=%s, roles=%s", 
-                db_user.id, db_user.email, [r.value for r in user_data.roles])
-    
+
+    logger.info("New user registered: user_id=%s, email=%s, role=%s",
+                db_user.id, db_user.email, db_user.role.value)
+
     return db_user
 
 
@@ -121,7 +113,7 @@ def login(
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        roles=[user.role]  # Currently single role, will be expanded
+        role=user.role,
     )
 
 
@@ -160,7 +152,7 @@ def refresh_token(
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
-        roles=[user.role]
+        role=user.role,
     )
 
 

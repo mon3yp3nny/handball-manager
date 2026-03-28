@@ -18,13 +18,7 @@ class UserBase(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
-    roles: List[UserRole] = [UserRole.PLAYER]  # Changed from single role to list
-    
-    @validator('roles')
-    def validate_roles(cls, v):
-        if not v:
-            return [UserRole.PLAYER]
-        return v
+    role: UserRole = UserRole.PLAYER
 
 
 # Create schemas
@@ -37,7 +31,7 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
-    roles: Optional[List[UserRole]] = None  # Can update roles list
+    role: Optional[UserRole] = None
     is_active: Optional[bool] = None
 
 
@@ -48,11 +42,6 @@ class UserResponse(UserBase):
     is_verified: bool
     created_at: datetime
     updated_at: datetime
-    
-    # Backward compatibility - single role property
-    @property
-    def role(self) -> UserRole:
-        return self.roles[0] if self.roles else UserRole.PLAYER
 
     class Config:
         from_attributes = True
@@ -76,7 +65,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    roles: List[UserRole]  # Include roles in token response
+    role: UserRole
 
 
 class LoginRequest(BaseModel):
@@ -98,19 +87,13 @@ class InvitationCreate(BaseModel):
     email: EmailStr
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    role: UserRole  # Single role for invitation
+    role: UserRole
     team_id: Optional[int] = None
-    
-    
+
+
 class UserRoleUpdate(BaseModel):
-    """Schema for updating user roles."""
-    roles: List[UserRole]
-    
-    @validator('roles')
-    def validate_roles_not_empty(cls, v):
-        if not v:
-            raise ValueError("At least one role is required")
-        return v
+    """Schema for updating user role."""
+    role: UserRole
 
 
 class AdminUserCreate(UserBase):
