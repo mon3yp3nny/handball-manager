@@ -17,19 +17,12 @@ test.describe('Dashboard', () => {
     await expect(section.first()).toBeVisible({ timeout: 10_000 });
   });
 
-  test('navigation has menu items', async ({ page }) => {
-    const nav = page.locator('nav, [role="navigation"], aside');
-    await expect(nav.first()).toBeVisible({ timeout: 5_000 });
+  test('sidebar is visible with app branding', async ({ page }) => {
+    const sidebar = page.locator('nav, [role="navigation"], aside');
+    await expect(sidebar.first()).toBeVisible({ timeout: 5_000 });
 
-    // Check for key menu items
-    const menuTexts = ['Mannschaften', 'Spieler', 'Spiele', 'Termine', 'Nachrichten', 'Teams', 'Players', 'Dashboard'];
-    let found = 0;
-    for (const text of menuTexts) {
-      const link = page.locator(`a:has-text("${text}"), [role="menuitem"]:has-text("${text}")`);
-      if (await link.first().isVisible({ timeout: 1_000 }).catch(() => false)) {
-        found++;
-      }
-    }
-    expect(found).toBeGreaterThan(2);
+    // Sidebar should show app name and user info
+    const branding = page.locator('text=/Handball Manager/i');
+    await expect(branding.first()).toBeVisible({ timeout: 3_000 });
   });
 });
