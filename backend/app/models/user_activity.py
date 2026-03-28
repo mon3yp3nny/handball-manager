@@ -14,6 +14,7 @@ class ActivityType(str, enum.Enum):
     UPDATED = "updated"
     DELETED = "deleted"
     ROLE_CHANGE = "role_change"
+    ACCOUNT_DELETION = "account_deletion"
 
 
 class UserActivity(Base):

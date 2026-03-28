@@ -154,6 +154,33 @@ def delete_user(
     return {"message": "User deactivated"}
 
 
+@router.delete("/me/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_my_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Allow user to delete their own account (soft delete)"""
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Soft delete - deactivate account
+    user.is_active = False
+    db.commit()
+    
+    # Log the deletion
+    from app.models.user_activity import UserActivity, ActivityType
+    activity = UserActivity(
+        user_id=current_user.id,
+        activity_type=ActivityType.ACCOUNT_DELETION,
+        description=f"User account deleted by user ({current_user.email})"
+    )
+    db.add(activity)
+    db.commit()
+    
+    return {"message": "Account deleted successfully"}
+
+
 @router.post("/{user_id}/reset-password", status_code=status.HTTP_200_OK)
 def reset_user_password(
     user_id: int,

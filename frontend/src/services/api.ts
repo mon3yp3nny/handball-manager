@@ -125,6 +125,12 @@ class ApiService {
     return response.data;
   }
 
+  // Delete user account
+  async deleteAccount(): Promise<void> {
+    await this.client.delete('/users/me/account');
+    return;
+  }
+
   async setOAuthRole(role: UserRole): Promise<void> {
     await this.client.post('/oauth/set-role', { role });
   }

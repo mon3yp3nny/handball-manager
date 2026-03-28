@@ -1,11 +1,19 @@
 import { useState } from 'react';
-import { User, Mail, Phone, Shield } from 'lucide-react';
+import { User, Mail, Phone, Shield, AlertTriangle } from 'lucide-react';
 import { useRole, useAuthStore } from '@/store/authStore';
 import { UserRole } from '@/types';
+import { api } from '@/services/api';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export const ProfilePage = () => {
   const { user, role } = useRole();
+  const navigate = useNavigate();
+  const { logout } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
 
   const getRoleLabel = (role: UserRole) => {
     switch (role) {
@@ -15,6 +23,26 @@ export const ProfilePage = () => {
       case UserRole.PLAYER: return 'Spieler';
       case UserRole.PARENT: return 'Elternteil';
       default: return role;
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (confirmText !== 'LÖSCHEN') {
+      toast.error('Bitte gib "LÖSCHEN" ein, um fortzufahren');
+      return;
+    }
+    
+    setIsDeleting(true);
+    try {
+      await api.deleteAccount();
+      toast.success('Dein Konto wurde erfolgreich gelöscht');
+      logout();
+      navigate('/login');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || 'Fehler beim Löschen des Kontos');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -64,13 +92,84 @@ export const ProfilePage = () => {
           </button>
         </div>
 
-        {/* Activity Card */}
-        <div className="lg:col-span-2 card p-6">
-          <h2 className="text-lg font-semibold mb-4">Aktivität</h2>
-          
-          <p className="text-gray-500">Hier werden zukünftig Ihre Aktivitäten angezeigt.</p>
+        {/* Settings Card */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Activity Card */}
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold mb-4">Aktivität</h2>
+            
+            <p className="text-gray-500">Hier werden zukünftig Ihre Aktivitäten angezeigt.</p>
+          </div>
+
+          {/* Danger Zone */}
+          <div className="card p-6 border-red-200">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+              <h2 className="text-lg font-semibold text-red-600">Gefahrenzone</h2>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Das Löschen deines Kontos kann nicht rückgängig gemacht werden. Alle deine Daten werden dauerhaft gelöscht.
+            </p>
+            
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Konto löschen
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-600 mr-2" />
+              <h2 className="text-xl font-semibold text-red-600">Konto löschen</h2>
+            </div>
+            
+            <p className="text-gray-700 mb-4">
+              Bist du sicher, dass du dein Konto löschen möchtest? Diese Aktion kann <strong>nicht rückgängig</strong> gemacht werden.
+            </p>
+            
+            <div className="bg-gray-50 p-4 rounded-lg mb-4">
+              <p className="text-sm text-gray-600">
+                Gib <code className="bg-gray-200 px-1 rounded">LÖSCHEN</code> ein, um zu bestätigen:
+              </p>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="LÖSCHEN"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setConfirmText('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={isDeleting}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || confirmText !== 'LÖSCHEN'}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Wird gelöscht...' : 'Endgültig löschen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
