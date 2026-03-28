@@ -151,16 +151,6 @@ async def create_player(
             child_team=team.name if team else "Kein Team zugewiesen",
             coach_name=f"{current_user.first_name} {current_user.last_name}"
         )
-            to_email=parent_data['email'],
-            first_name=parent_data['first_name'],
-            last_name=parent_data['last_name'],
-            password=password,
-            child_name=f"{user.first_name} {user.last_name}",
-            child_team=team.name if team else "Kein Team zugewiesen",
-            coach_name=f"{current_user.first_name} {current_user.last_name}"
-        )
-    
->>>>>>> 07df1fb (feat: Implement production-ready email system)
     # Link parents to player
     all_parent_ids = set(parent_ids + created_parent_ids)
     for parent_id in all_parent_ids:
