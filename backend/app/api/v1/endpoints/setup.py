@@ -67,11 +67,16 @@ def init_database(
                 first_name="System",
                 last_name="Administrator",
                 role=UserRole.ADMIN,
-                roles_data=json.dumps([UserRole.ADMIN.value]),
                 is_verified=True,
                 is_active=True
             )
             db.add(admin)
+            db.commit()
+            # Set roles_data after creation
+            db.execute(
+                text("UPDATE users SET roles_data = :roles WHERE id = :id"),
+                {"roles": json.dumps([UserRole.ADMIN.value]), "id": admin.id}
+            )
             db.commit()
             results.append("✅ Created admin: admin@handball.local / Admin123!")
         else:
@@ -164,11 +169,16 @@ def init_database(
                     first_name=user_data['first_name'],
                     last_name=user_data['last_name'],
                     role=user_data['roles'][0],
-                    roles_data=json.dumps([r.value for r in user_data['roles']]),
                     is_verified=True,
                     is_active=True
                 )
                 db.add(user)
+                db.commit()
+                # Set roles_data after creation
+                db.execute(
+                    text("UPDATE users SET roles_data = :roles WHERE id = :id"),
+                    {"roles": json.dumps([r.value for r in user_data['roles']]), "id": user.id}
+                )
                 db.commit()
                 created += 1
                 
@@ -252,7 +262,7 @@ def init_database(
                 title=event_data['title'],
                 team_id=team_id,
                 event_type=EventType.TRAINING if 'Training' in event_data['title'] else EventType.MEETING,
-                visibility=EventVisibility.TEAM if team_id else EventVisibility.CLUB,
+                visibility=EventVisibility.TEAM if team_id else EventVisibility.CLUB_WIDE,
                 location='Sporthalle',
                 start_time=start,
                 end_time=end
