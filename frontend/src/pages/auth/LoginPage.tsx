@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin, GoogleOAuthProvider, CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/hooks/useAuth';
 import { UserLogin, UserRole } from '@/types';
@@ -227,6 +227,14 @@ export const LoginPage = () => {
               {login.isPending ? 'Wird angemeldet...' : 'Anmelden'}
             </button>
           </form>
+
+          {/* Registration Link */}
+          <div className="mt-6 text-center">
+            <span className="text-gray-500 text-sm">Noch kein Konto? </span>
+            <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium text-sm">
+              Jetzt registrieren
+            </Link>
+          </div>
           
           {import.meta.env.DEV && (
             <div className="mt-6 text-center text-sm text-gray-500">

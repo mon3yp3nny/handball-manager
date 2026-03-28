@@ -6,7 +6,7 @@ steps:
       - '-f'
       - 'Dockerfile.cloudrun'
       - '--build-arg'
-      - 'VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app'
+      - 'VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app/api/v1'
       - '--build-arg'
       - 'VITE_GOOGLE_CLIENT_ID=${_VITE_GOOGLE_CLIENT_ID}'
       - '--build-arg'

@@ -5,8 +5,8 @@ import mockApi from './mockApi';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-// Mock API fallback is only used in development
-let useMockApi = import.meta.env.DEV;
+// Mock API fallback is only used in development when no backend URL is set
+let useMockApi = !import.meta.env.VITE_API_URL && import.meta.env.DEV;
 
 class ApiService {
   private client: AxiosInstance;
@@ -116,6 +116,12 @@ class ApiService {
       first_name: firstName,
       last_name: lastName,
     });
+    return response.data;
+  }
+
+  // Register new user
+  async register(userData: { email: string; password: string; first_name: string; last_name: string; phone?: string; role: UserRole }): Promise<User> {
+    const response = await this.client.post<User>('/auth/register', userData);
     return response.data;
   }
 

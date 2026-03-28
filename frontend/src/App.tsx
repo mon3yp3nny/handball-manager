@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 
 // Pages
 import { LoginPage } from '@/pages/auth/LoginPage';
+import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { TeamsPage } from '@/pages/Teams/TeamsPage';
 import { TeamDetailPage } from '@/pages/Teams/TeamDetailPage';
@@ -64,6 +65,7 @@ function App() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
 
       {/* Protected routes */}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
