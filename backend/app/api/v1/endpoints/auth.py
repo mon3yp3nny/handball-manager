@@ -79,6 +79,8 @@ def register(
     logger.info("New user registered: user_id=%s, email=%s", db_user.id, db_user.email)
     
     return db_user
+    
+    return db_user
 
 
 @router.post("/login", response_model=TokenResponse)
