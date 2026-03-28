@@ -1,7 +1,8 @@
 """Common pagination schemas."""
-from pydantic import BaseModel, Field
 from typing import List, Generic, TypeVar, Optional
 from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 T = TypeVar('T')
