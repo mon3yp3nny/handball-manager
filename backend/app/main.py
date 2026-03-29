@@ -42,8 +42,20 @@ app = FastAPI(
     openapi_url="/api/v1/openapi.json",
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=True,
 )
+
+
+@app.middleware("http")
+async def add_trailing_slash_middleware(request: Request, call_next):
+    """Handle trailing slash mismatches by internally rewriting the URL
+    instead of returning a 307 redirect (which loses auth headers)."""
+    from starlette.datastructures import URL
+    path = request.url.path
+    if path.startswith("/api/") and not path.endswith("/") and "." not in path.split("/")[-1]:
+        request.scope["path"] = path + "/"
+    return await call_next(request)
 
 # Attach limiter to app state
 app.state.limiter = limiter
