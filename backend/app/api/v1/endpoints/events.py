@@ -14,7 +14,7 @@ from app.schemas.common import PaginatedResponse
 router = APIRouter()
 
 
-@router.get("/", response_model=List[EventResponse])
+@router.get("/", response_model=PaginatedResponse[EventResponse])
 def get_events(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -85,8 +85,9 @@ def get_events(
         week_later = now + timedelta(days=7)
         query = query.filter(Event.start_time >= now).filter(Event.end_time <= week_later)
     
+    total = query.count()
     events = query.order_by(Event.start_time).offset(skip).limit(limit).all()
-    return events
+    return {"items": events, "total": total, "skip": skip, "limit": limit}
 
 
 @router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)

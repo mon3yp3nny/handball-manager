@@ -20,9 +20,9 @@ test.beforeAll(async () => {
 });
 
 test.describe('RBAC - Role-Based Access Control', () => {
-  test('coach cannot create teams (admin-only)', async ({ request }) => {
-    const coach = new AuthenticatedClient(request, coachTokens);
-    const res = await coach.post('/api/v1/teams', {
+  test('parent cannot create teams (admin-only)', async ({ request }) => {
+    const parent = new AuthenticatedClient(request, parentTokens);
+    const res = await parent.post('/api/v1/teams', {
       name: uniqueName('Forbidden'),
       age_group: 'U15',
     });

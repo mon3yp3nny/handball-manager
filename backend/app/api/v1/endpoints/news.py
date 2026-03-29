@@ -9,11 +9,12 @@ from app.models.news import News
 from app.models.team import Team
 from app.models.player import Player
 from app.schemas.news import NewsCreate, NewsUpdate, NewsResponse, NewsWithAuthor, NewsPublish
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[NewsResponse])
+@router.get("/", response_model=PaginatedResponse[NewsResponse])
 def get_news(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -57,8 +58,9 @@ def get_news(
     elif only_published:
         query = query.filter(News.is_published == True)
     
+    total = query.count()
     news = query.order_by(News.created_at.desc()).offset(skip).limit(limit).all()
-    return news
+    return {"items": news, "total": total, "skip": skip, "limit": limit}
 
 
 @router.post("/", response_model=NewsResponse, status_code=status.HTTP_201_CREATED)

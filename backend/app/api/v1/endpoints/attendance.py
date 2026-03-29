@@ -12,11 +12,12 @@ from app.schemas.attendance import (
     AttendanceCreate, AttendanceUpdate, AttendanceResponse,
     AttendanceWithPlayer, BulkAttendanceUpdate
 )
+from app.schemas.common import PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[AttendanceResponse])
+@router.get("/", response_model=PaginatedResponse[AttendanceResponse])
 def get_attendance(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -47,8 +48,9 @@ def get_attendance(
         child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         query = query.filter(Attendance.player_id.in_(child_ids))
     
+    total = query.count()
     records = query.offset(skip).limit(limit).all()
-    return records
+    return {"items": records, "total": total, "skip": skip, "limit": limit}
 
 
 @router.post("/event/{event_id}/initialize", status_code=status.HTTP_201_CREATED)
