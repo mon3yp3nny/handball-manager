@@ -32,7 +32,7 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("3/minute")
+@limiter.limit("10/minute")
 def register(
     request: Request,
     user_data: UserCreate,
@@ -82,7 +82,7 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
+@limiter.limit("30/minute")
 def login(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
