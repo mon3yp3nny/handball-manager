@@ -81,7 +81,8 @@ def register(
     return db_user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, name="login")
+@router.post("/login/", response_model=TokenResponse, include_in_schema=False)
 @limiter.limit("30/minute")
 def login(
     request: Request,
