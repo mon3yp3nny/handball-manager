@@ -25,23 +25,29 @@ def get_teams(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Team)
-
-    # Filter by role
-    if current_user.has_role(UserRole.PLAYER):
+    
+    # Filter by role - Admin and Supervisor see all teams
+    if current_user.has_role(UserRole.ADMIN) or current_user.has_role(UserRole.SUPERVISOR):
+        # Admin and Supervisor see all teams - no filter needed
+        pass
+    elif current_user.has_role(UserRole.COACH):
+        # Coaches see teams they manage
+        query = query.filter(Team.coach_id == current_user.id)
+    elif current_user.has_role(UserRole.PLAYER):
         # Players see only their team
         player = db.query(Player).filter(Player.user_id == current_user.id).first()
         if player and player.team_id:
             query = query.filter(Team.id == player.team_id)
+        else:
+            # Player not assigned to any team - show empty list or all teams for discovery
+            # For now, show all teams so they can find a team to join
+            pass
     elif current_user.has_role(UserRole.PARENT):
         # Parents see teams of their children
         from app.models.parent_child import ParentChild
         child_player_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
         child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_player_ids)).subquery()
         query = query.filter(Team.id.in_(child_team_ids))
-    elif current_user.has_role(UserRole.COACH):
-        # Coaches see teams they manage
-        query = query.filter(Team.coach_id == current_user.id)
-
     if age_group:
         query = query.filter(Team.age_group == age_group)
 
