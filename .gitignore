@@ -70,5 +70,8 @@ coverage.xml
 alembic/versions/*.py
 !alembic/versions/__init__.py
 
+# Screenshots (development artifacts)
+screenshots/
+
 # Docker
 .dockerignore
