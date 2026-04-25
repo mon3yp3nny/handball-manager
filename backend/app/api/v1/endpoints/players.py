@@ -52,7 +52,7 @@ def get_players(
         query = query.filter(Player.team_id == team_id)
 
     total = query.count()
-    players = query.offset(skip).limit(limit).all()
+    players = query.order_by(Player.id.desc()).offset(skip).limit(limit).all()
     
     return {
         "items": players,
