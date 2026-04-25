@@ -14,10 +14,23 @@ function getCachePath(email: string): string {
   return path.join(CACHE_DIR, `${email.replace(/[@.]/g, '_')}.json`);
 }
 
+function isTokenExpired(accessToken: string): boolean {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(accessToken.split('.')[1], 'base64').toString('utf-8'),
+    );
+    return typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now() + 60_000;
+  } catch {
+    return true;
+  }
+}
+
 function readCachedTokens(email: string): Tokens | null {
   try {
     const data = fs.readFileSync(getCachePath(email), 'utf-8');
-    return JSON.parse(data);
+    const tokens: Tokens = JSON.parse(data);
+    if (isTokenExpired(tokens.access_token)) return null;
+    return tokens;
   } catch {
     return null;
   }
