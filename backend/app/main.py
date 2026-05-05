@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    settings.validate_required_secrets()
     logger.info("Starting up Handball Manager API...")
     yield
     # Shutdown - dispose of the DB engine to release all pooled connections
