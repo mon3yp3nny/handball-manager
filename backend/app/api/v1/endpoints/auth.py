@@ -22,7 +22,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     user = db.query(User).filter(User.email == email).first()
-    if not user:
+    if not user or not user.hashed_password:
         return None
     if not security.verify_password(password, user.hashed_password):
         return None

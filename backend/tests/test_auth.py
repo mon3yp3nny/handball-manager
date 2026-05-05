@@ -43,6 +43,30 @@ class TestLogin:
         )
         assert resp.status_code == 401
 
+    def test_login_oauth_only_user_returns_401_not_500(self, client, db):
+        """Regression: OAuth-only users have hashed_password=None.
+        passlib.verify_password() raises on None, which previously leaked
+        a 500 with stack trace instead of a clean 401."""
+        from app.models.user import User
+        user = User(
+            email="oauth-only@test.com",
+            hashed_password=None,
+            first_name="OAuth",
+            last_name="Only",
+            role=UserRole.PLAYER,
+            is_active=True,
+            is_verified=True,
+            is_oauth_only=True,
+        )
+        db.add(user)
+        db.commit()
+        resp = client.post(
+            "/api/v1/auth/login",
+            data={"username": "oauth-only@test.com", "password": "anything"},
+        )
+        assert resp.status_code == 401
+        assert "Incorrect email or password" in resp.json()["detail"]
+
 
 class TestRefreshToken:
     def test_refresh_success(self, client, db):
