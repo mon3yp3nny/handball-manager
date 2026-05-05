@@ -40,6 +40,7 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_verified: bool
+    roles: List[UserRole] = []
     created_at: datetime
     updated_at: datetime
 

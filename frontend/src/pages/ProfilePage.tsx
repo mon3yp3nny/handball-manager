@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 export const ProfilePage = () => {
   const { user, role } = useRole();
+  const allRoles = (user?.roles && user.roles.length > 0) ? user.roles : (role ? [role] : []);
   const navigate = useNavigate();
   const { logout } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
@@ -64,7 +65,11 @@ export const ProfilePage = () => {
               {user?.first_name} {user?.last_name}
             </h2>
             
-            <span className="badge-blue mt-2">{getRoleLabel(role!)}</span>
+            <div className="flex flex-wrap gap-2 mt-2 justify-center">
+              {allRoles.map((r) => (
+                <span key={r} className="badge-blue">{getRoleLabel(r)}</span>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 space-y-4">
@@ -78,9 +83,12 @@ export const ProfilePage = () => {
               <span>{user?.phone || 'Keine Telefonnummer'}</span>
             </div>
 
-            <div className="flex items-center">
-              <Shield className="w-5 h-5 text-gray-400 mr-3" />
-              <span>Rolle: {getRoleLabel(role!)}</span>
+            <div className="flex items-start">
+              <Shield className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
+              <span>
+                {allRoles.length > 1 ? 'Rollen: ' : 'Rolle: '}
+                {allRoles.map(getRoleLabel).join(', ')}
+              </span>
             </div>
           </div>
 

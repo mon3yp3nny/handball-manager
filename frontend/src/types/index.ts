@@ -13,7 +13,8 @@ export interface User {
   first_name: string;
   last_name: string;
   phone?: string;
-  role: UserRole;
+  role: UserRole;          // primary role (legacy, still drives single-role UI)
+  roles?: UserRole[];      // full multi-role list when populated by backend
   is_active: boolean;
   created_at: string;
   updated_at?: string;

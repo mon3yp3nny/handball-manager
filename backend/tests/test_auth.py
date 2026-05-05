@@ -1,7 +1,7 @@
 """Tests for authentication endpoints: login, token refresh, /me."""
 from tests.conftest import _make_user, _make_token, _auth_header
 from app.models.user import UserRole
-from app.core.security import create_refresh_token
+from app.core.security import create_refresh_token, create_access_token, get_password_hash
 
 
 class TestLogin:
@@ -105,6 +105,35 @@ class TestMe:
         body = resp.json()
         assert body["email"] == coach_user.email
         assert body["role"] == "coach"
+        # Single-role user falls back to [role]
+        assert body["roles"] == ["coach"]
+
+    def test_me_returns_full_role_list_for_multi_role_user(self, client, db):
+        """Regression: multi-role users (roles_data populated) must surface
+        the full list via /auth/me, not just the primary role."""
+        import json
+        from app.models.user import User
+        user = User(
+            email="multi@test.com",
+            hashed_password=get_password_hash("testpassword123"),
+            first_name="Multi",
+            last_name="Role",
+            role=UserRole.COACH,
+            roles_data=json.dumps(["coach", "player", "parent"]),
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(user)
+        db.commit()
+        token = create_access_token(data={"sub": user.email, "role": user.role.value})
+        resp = client.get(
+            "/api/v1/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["role"] == "coach"
+        assert sorted(body["roles"]) == ["coach", "parent", "player"]
 
     def test_me_unauthenticated(self, client):
         resp = client.get("/api/v1/auth/me")

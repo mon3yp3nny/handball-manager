@@ -1,5 +1,6 @@
 """User model with OAuth support."""
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, Enum
+import json
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey, Table, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -31,6 +32,9 @@ class User(Base):
     # set-role endpoint to first-time use only — without this, any OAuth user
     # could re-call /oauth/set-role to escalate to admin (#88).
     role_selected = Column(Boolean, default=False, nullable=False, server_default="false")
+    # JSON list of role values (e.g. '["coach","player","parent"]'). Holds the
+    # full multi-role assignment; `role` above is the primary/legacy single role.
+    roles_data = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -42,22 +46,38 @@ class User(Base):
     sent_invitations = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="inviter")
     activities = relationship("UserActivity", back_populates="user", order_by="desc(UserActivity.created_at)")
     
-    # Multi-role support - roles are stored in JWT, primary role in DB
+    @property
+    def roles(self) -> list:
+        """Full list of UserRole enum values for this user.
+
+        Reads roles_data JSON if populated; falls back to [self.role] for
+        users created before multi-role support landed.
+        """
+        if self.roles_data:
+            try:
+                raw = json.loads(self.roles_data)
+                parsed = [UserRole(v) for v in raw if v in UserRole._value2member_map_]
+                if parsed:
+                    return parsed
+            except (ValueError, TypeError):
+                pass
+        return [self.role]
+
     @property
     def roles_list(self):
-        """Get all roles as list - for backward compatibility returns single role."""
-        return [self.role]
-    
+        """Backwards-compatible alias for `roles`."""
+        return self.roles
+
     def has_role(self, check_role):
-        """Check if user has specific role - compares with primary role."""
+        """Check if user has the specified role (matches against any role in `roles`)."""
         if isinstance(check_role, UserRole):
-            return self.role == check_role
-        return self.role.value == check_role
-    
+            return check_role in self.roles
+        return any(r.value == check_role for r in self.roles)
+
     def has_any_role(self, roles):
         """Check if user has any of the specified roles."""
         return any(self.has_role(r) for r in roles)
-    
+
     def has_all_roles(self, roles):
         """Check if user has all specified roles."""
         return all(self.has_role(r) for r in roles)
