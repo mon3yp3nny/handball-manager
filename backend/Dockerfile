@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+RUN chmod +x /app/scripts/start.sh
+
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
@@ -22,4 +24,4 @@ USER appuser
 ENV PORT=8080
 EXPOSE ${PORT}
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["/app/scripts/start.sh"]
