@@ -120,7 +120,17 @@ Connect to `/ws`, send `{"token": "<JWT>"}` to authenticate, then `{"action": "s
 
 The frontend has a dev-only `DevRoleSwitcher` component with hardcoded demo users for quick role testing. Mock API (`mockApi.ts`) provides fallback data when the backend is unavailable. Both are tree-shaken from production builds.
 
-**Demo accounts:** admin@handball.de/admin123, coach@handball.de/coach123, eltern@handball.de/parent123
+**Frontend-only demo accounts (mockApi / DevRoleSwitcher, no backend needed):** `admin@handball.de`, `coach@handball.de`, `supervisor@handball.de`, `spieler@handball.de`, `eltern@handball.de` (passwords: `admin123` / `coach123` / `parent123` etc. — only valid against `mockApi.ts`)
+
+**Backend-seeded accounts (real auth flow, run `backend/scripts/setup_data.py` first):**
+- `admin@handball.local` / `Admin123!` — Admin
+- `max.mustermann@example.com` / `Test123!` — Coach + Player + Parent (multi-role)
+- `anna.schmidt@example.com` / `Test123!` — Supervisor + Parent
+- `thomas.weber@example.com` / `Test123!` — Coach + Player
+- `lisa.mueller@example.com` / `Test123!` — Player only
+- `klaus.klein@example.com` / `Test123!` — Parent only
+
+The login page (`/login`) shows a click-to-fill list of backend-seeded accounts when running in dev builds.
 
 ## API Documentation
 
