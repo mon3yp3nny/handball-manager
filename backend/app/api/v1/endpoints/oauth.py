@@ -70,7 +70,7 @@ async def google_oauth_login(
         first_name=user.first_name,
         last_name=user.last_name,
         is_new_user=is_new_user,
-        needs_role_selection=is_new_user  # New users need to select role
+        needs_role_selection=not user.role_selected,
     )
 
 
@@ -132,7 +132,7 @@ async def apple_oauth_login(
         first_name=user.first_name,
         last_name=user.last_name,
         is_new_user=is_new_user,
-        needs_role_selection=is_new_user  # New users need to select role
+        needs_role_selection=not user.role_selected,
     )
 
 
@@ -143,15 +143,38 @@ async def set_oauth_user_role(
     db: Session = Depends(get_db)
 ):
     """
-    Set role for OAuth user (called after first login if needs_role_selection is true).
+    Set role for OAuth user during the initial registration flow.
+    Idempotent guard (#88): once a user has chosen a role, this endpoint
+    refuses further changes — preventing self-service privilege escalation.
     """
     if not current_user.is_oauth_only:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only OAuth users can set role this way"
+            detail="Only OAuth users can set role this way",
+        )
+
+    if current_user.role_selected:
+        logger.warning(
+            "Blocked /oauth/set-role re-call by user_id=%s (already chose %s, requested %s)",
+            current_user.id, current_user.role.value, role.value,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Role has already been selected and cannot be changed via this endpoint",
+        )
+
+    if role == UserRole.ADMIN:
+        logger.warning(
+            "Blocked self-service ADMIN role selection by user_id=%s", current_user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role cannot be self-assigned",
         )
 
     current_user.role = role
+    current_user.role_selected = True
     db.commit()
 
+    logger.info("OAuth user user_id=%s set role to %s", current_user.id, role.value)
     return {"message": "Role updated successfully", "role": role.value}

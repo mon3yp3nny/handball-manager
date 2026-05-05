@@ -27,6 +27,10 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     is_oauth_only = Column(Boolean, default=False)  # True if user only has OAuth login
+    # True once the user has completed initial role selection. Gates the OAuth
+    # set-role endpoint to first-time use only — without this, any OAuth user
+    # could re-call /oauth/set-role to escalate to admin (#88).
+    role_selected = Column(Boolean, default=False, nullable=False, server_default="false")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
