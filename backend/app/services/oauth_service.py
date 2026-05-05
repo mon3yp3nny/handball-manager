@@ -198,9 +198,9 @@ class OAuthService:
     def create_tokens(user: User) -> Dict[str, str]:
         """Create access and refresh tokens for user."""
         token_data = {
-            "sub": str(user.id),
-            "email": user.email,
-            "role": user.role.value
+            "sub": user.email,
+            "user_id": user.id,
+            "role": user.role.value,
         }
 
         access_token = create_access_token(token_data)
