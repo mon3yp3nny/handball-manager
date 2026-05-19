@@ -108,3 +108,48 @@ class TestTeamPlayers:
             headers=coach_headers,
         )
         assert resp.status_code == 200
+
+
+class TestGetTeamAuthorization:
+    """Regression tests for #86 — GET /teams/{id} must apply the same
+    role-based visibility as GET /teams/, not leak any team by id."""
+
+    def test_admin_can_access_any_team(self, client, admin_headers, team):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=admin_headers)
+        assert resp.status_code == 200
+
+    def test_supervisor_can_access_any_team(self, client, supervisor_headers, team):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=supervisor_headers)
+        assert resp.status_code == 200
+
+    def test_owning_coach_can_access(self, client, coach_headers, team):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=coach_headers)
+        assert resp.status_code == 200
+
+    def test_player_on_team_can_access(self, client, player_headers, team, player_profile):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=player_headers)
+        assert resp.status_code == 200
+
+    def test_parent_of_child_on_team_can_access(
+        self, client, parent_headers, team, parent_child_link
+    ):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=parent_headers)
+        assert resp.status_code == 200
+
+    def test_unrelated_player_is_denied(self, client, player_headers, team):
+        # player_user has no Player profile / team -> previously leaked (200)
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=player_headers)
+        assert resp.status_code == 403
+
+    def test_unrelated_parent_is_denied(self, client, parent_headers, team):
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=parent_headers)
+        assert resp.status_code == 403
+
+    def test_other_coach_is_denied(self, client, db, team):
+        other = _make_user(db, email="other.coach@test.com", role=UserRole.COACH)
+        resp = client.get(f"/api/v1/teams/{team.id}", headers=_auth_header(other))
+        assert resp.status_code == 403
+
+    def test_missing_team_still_404_for_authorized(self, client, admin_headers):
+        resp = client.get("/api/v1/teams/99999", headers=admin_headers)
+        assert resp.status_code == 404

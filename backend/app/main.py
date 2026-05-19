@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.core.rate_limit import limiter
 from app.api.v1.api import api_router
-from app.db.session import engine, Base
+from app.db.session import engine, Base, SessionLocal
 from app.models import *
 from app.core.deps import get_current_user
 from app.websocket.manager import manager
@@ -127,11 +127,33 @@ async def websocket_endpoint(websocket: WebSocket):
                 if message.get("action") == "subscribe_team":
                     team_id = message.get("team_id")
                     if team_id:
-                        manager.subscribe_to_team(user_id, team_id)
-                        await websocket.send_text(json.dumps({
-                            "type": "subscribed",
-                            "team_id": team_id
-                        }))
+                        # Authorize the subscription with the same role-based
+                        # rules as the REST endpoints. user_id is the JWT
+                        # subject (email); resolve the actual User to check.
+                        from app.core.permissions import can_access_team
+                        db = SessionLocal()
+                        try:
+                            ws_user = db.query(User).filter(
+                                User.email == user_id
+                            ).first()
+                            allowed = ws_user is not None and can_access_team(
+                                ws_user, team_id, db
+                            )
+                        finally:
+                            db.close()
+
+                        if not allowed:
+                            await websocket.send_text(json.dumps({
+                                "type": "error",
+                                "message": "Access denied to this team",
+                                "team_id": team_id
+                            }))
+                        else:
+                            manager.subscribe_to_team(user_id, team_id)
+                            await websocket.send_text(json.dumps({
+                                "type": "subscribed",
+                                "team_id": team_id
+                            }))
 
                 elif message.get("action") == "unsubscribe_team":
                     team_id = message.get("team_id")

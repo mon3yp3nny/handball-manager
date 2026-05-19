@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_admin, require_coach, require_coach_or_supervisor
+from app.core.permissions import can_access_team
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
@@ -93,6 +94,11 @@ def get_team(
     ).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    if not can_access_team(current_user, team_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this team",
+        )
     return team
 
 
