@@ -8,12 +8,6 @@ REGION="europe-west1"
 BACKEND_IMAGE="gcr.io/${PROJECT_ID}/handball-backend"
 FRONTEND_IMAGE="gcr.io/${PROJECT_ID}/handball-frontend"
 
-# Set Python for gcloud
-export CLOUDSDK_PYTHON=/opt/homebrew/bin/python3.11
-
-# Source gcloud
-source ~/google-cloud-sdk/path.zsh.inc
-
 echo "🔧 Building and deploying Handball Manager..."
 echo "Project: ${PROJECT_ID}"
 echo "Region: ${REGION}"
