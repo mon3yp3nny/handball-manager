@@ -73,5 +73,17 @@ alembic/versions/*.py
 # Screenshots (development artifacts)
 screenshots/
 
+# Playwright / test output (regenerated on every run)
+playwright-report/
+test-results/
+frontend/test-results-*.json
+.last-run.json
+
+# Production env (built/injected at deploy time, not committed)
+.env.production
+
+# Claude Code local state
+.claude/scheduled_tasks.lock
+
 # Docker
 .dockerignore
