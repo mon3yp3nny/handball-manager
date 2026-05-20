@@ -2,88 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/* TVF design tokens — must come AFTER the Tailwind layers so the
+   :root CSS vars defined here are available to every component. */
+@import "./tvf-tokens.css";
+
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-tvf-canvas text-tvf-ink antialiased font-sans;
+    font-feature-settings: "ss01", "cv11";
+    letter-spacing: -0.005em;
   }
+  /* Display headings — Anton, uppercase. Reach for these via class
+     "font-display" on individual elements; we don't apply them to every
+     h1 because some headings in tables/cards should stay UI font. */
+  h1, h2, h3 { color: var(--tvf-ink); }
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-bold rounded-tvf-sm shadow-tvf-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
   }
-  
+
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply btn bg-tvf-red text-white border-tvf-red hover:bg-tvf-red-deep focus:ring-tvf-red;
   }
-  
+
   .btn-secondary {
-    @apply btn bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
+    @apply btn bg-tvf-surface text-tvf-ink border-tvf-line hover:bg-tvf-surface-2 focus:ring-tvf-navy;
   }
-  
+
+  .btn-navy {
+    @apply btn bg-tvf-navy text-tvf-ink-on-navy border-tvf-navy hover:bg-tvf-navy-deep focus:ring-tvf-navy;
+  }
+
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+    @apply btn bg-tvf-red-deep text-white border-tvf-red-deep hover:bg-tvf-red focus:ring-tvf-red;
   }
-  
+
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden;
+    @apply bg-tvf-surface rounded-tvf-md shadow-tvf-sm border border-tvf-line overflow-hidden;
   }
-  
+
   .input {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm;
+    @apply block w-full px-3 py-2 bg-tvf-surface border border-tvf-line rounded-tvf-sm shadow-tvf-sm focus:outline-none focus:ring-2 focus:ring-tvf-red focus:border-tvf-red sm:text-sm text-tvf-ink;
   }
-  
+
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-semibold text-tvf-ink-2 mb-1;
   }
-  
+
   .page-header {
     @apply mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between;
   }
-  
+
   .page-title {
-    @apply text-2xl font-bold text-gray-900;
+    /* Anton display + tight tracking — the brand voice. */
+    @apply text-3xl font-display tracking-wide uppercase text-tvf-ink;
   }
-  
+
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
-  
-  .badge-green {
-    @apply badge bg-green-100 text-green-800;
-  }
-  
-  .badge-yellow {
-    @apply badge bg-yellow-100 text-yellow-800;
-  }
-  
-  .badge-red {
-    @apply badge bg-red-100 text-red-800;
-  }
-  
+
+  /* Chip-style badges align with tvf-chip in the design — subtle by
+     default; -red / -navy / -green variants for state. */
   .badge-blue {
-    @apply badge bg-blue-100 text-blue-800;
+    @apply badge bg-tvf-navy text-tvf-ink-on-navy;
+  }
+  .badge-green {
+    @apply badge text-white;
+    background: var(--tvf-win);
+  }
+  .badge-yellow {
+    @apply badge text-white;
+    background: var(--tvf-draw);
+  }
+  .badge-red {
+    @apply badge bg-tvf-red-soft text-tvf-red-deep;
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
+/* Custom scrollbar — matches the warm canvas */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--tvf-surface-2); }
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: var(--tvf-line-strong);
   border-radius: 4px;
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
+::-webkit-scrollbar-thumb:hover { background: var(--tvf-ink-3); }
 
 /* Mobile optimizations */
 @media (max-width: 640px) {

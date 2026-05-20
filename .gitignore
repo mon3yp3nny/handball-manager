@@ -73,6 +73,11 @@ alembic/versions/*.py
 # Screenshots (development artifacts)
 screenshots/
 
+# Reference designs — local source-of-truth for visuals; the tokens that
+# matter are mirrored into frontend/src/styles/tvf-tokens.css. Keeping
+# the raw artifact out of git so the repo stays the canonical source.
+design/
+
 # Playwright / test output (regenerated on every run)
 playwright-report/
 test-results/

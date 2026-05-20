@@ -7,6 +7,7 @@ import { useAuthStore, roleLabels } from '@/store/authStore';
 import { Bug } from 'lucide-react';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
+import { ClubCrest } from '@/components/brand/ClubCrest';
 
 // Backend-seeded test accounts (see backend/scripts/setup_data.py).
 // Only rendered in dev builds.
@@ -152,20 +153,19 @@ export const LoginPage = () => {
   const appleClientId = import.meta.env.VITE_APPLE_CLIENT_ID || '';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="tvf-app min-h-screen bg-tvf-canvas flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-xl mb-4">
-            <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-              <circle cx="12" cy="12" r="5"/>
-            </svg>
+          <div className="inline-flex items-center justify-center mb-4">
+            <ClubCrest size={64} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Handball Manager</h1>
-          <p className="text-gray-600 mt-2">Willkommen zurück</p>
+          <h1 className="font-display tracking-wide uppercase text-3xl text-tvf-ink">
+            Handball Manager
+          </h1>
+          <p className="text-tvf-ink-2 mt-2">Willkommen zurück</p>
         </div>
-        
-        <div className="bg-white rounded-xl shadow-sm border p-8">
+
+        <div className="card p-8">
           {/* OAuth Login Buttons */}
           <div className="space-y-3 mb-6">
             {/* Google Sign In */}

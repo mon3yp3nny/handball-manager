@@ -11,7 +11,7 @@ export const AppLayout = () => {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row">
+    <div className="tvf-app min-h-screen bg-tvf-canvas flex flex-col md:flex-row">
       {/* Mobile header */}
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 
@@ -23,7 +23,7 @@ export const AppLayout = () => {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 pt-14 md:pt-0">
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-28 md:pb-6">
           <div className="max-w-7xl mx-auto">
             {/* Per-page boundary: a crash in one page keeps the shell usable.
                 resetKey on pathname clears the error when the user navigates. */}
