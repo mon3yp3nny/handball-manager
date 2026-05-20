@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, Bell, User as UserIcon, X } from 'lucide-react';
-import { useRole, useAuthStore } from '@/store/authStore';
+import { Menu, User as UserIcon, X } from 'lucide-react';
+import { useRole } from '@/store/authStore';
 import { useAuth } from '@/hooks/useAuth';
 
 interface HeaderProps {

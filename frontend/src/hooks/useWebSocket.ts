@@ -89,7 +89,7 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
   }, [send]);
 
   const unsubscribeFromTeam = useCallback((teamId: string) => {
-    send({ action: 'unsubscribe_team', team_id });
+    send({ action: 'unsubscribe_team', team_id: teamId });
   }, [send]);
 
   useEffect(() => {

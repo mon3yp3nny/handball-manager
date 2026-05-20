@@ -1,5 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { User, UserLogin, UserRegister, TokenResponse, OAuthLoginResponse, UserRole } from '@/types';
+import { User, UserLogin, TokenResponse, OAuthLoginResponse, UserRole } from '@/types';
 // Only import mock API in development - Vite tree-shakes this in production
 import mockApi from './mockApi';
 

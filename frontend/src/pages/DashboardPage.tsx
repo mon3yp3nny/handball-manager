@@ -1,19 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  Users,
-  Trophy,
-  Calendar,
-  ClipboardCheck,
-  TrendingUp,
-  Activity
-} from 'lucide-react';
+import { Users, Trophy, Calendar } from 'lucide-react';
 import { api } from '@/services/api';
 import { useRole } from '@/store/authStore';
 import { Game, Event } from '@/types';
 import { ParentDashboard } from './Family/ParentDashboard';
 
 export const DashboardPage = () => {
-  const { user, isCoach, isPlayer, isParent } = useRole();
+  const { user, isParent } = useRole();
 
   const { data: teamsCount } = useQuery({
     queryKey: ['teams-count'],

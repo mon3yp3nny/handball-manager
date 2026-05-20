@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, Mail, Phone, Shield, AlertTriangle } from 'lucide-react';
+import { Mail, Phone, Shield, AlertTriangle } from 'lucide-react';
 import { useRole, useAuthStore } from '@/store/authStore';
 import { UserRole } from '@/types';
 import { api } from '@/services/api';

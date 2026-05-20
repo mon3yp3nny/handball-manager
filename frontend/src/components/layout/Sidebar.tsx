@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -31,8 +31,8 @@ const navItems = [
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, role } = useRole();
-  const location = useLocation();
-  
+
+
   const filteredNavItems = navItems.filter(item => 
     role && item.roles.includes(role)
   );

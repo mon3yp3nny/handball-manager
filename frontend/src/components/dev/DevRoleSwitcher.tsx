@@ -1,5 +1,5 @@
 import { UserRole } from '@/types';
-import { useAuthStore, useUIStore, roleLabels, roleColors } from '@/store/authStore';
+import { useAuthStore, useUIStore, roleLabels } from '@/store/authStore';
 import { Bug, X } from 'lucide-react';
 
 export const DevRoleSwitcher = () => {

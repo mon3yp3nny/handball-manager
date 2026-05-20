@@ -1,4 +1,4 @@
-import { User, UserRole, Team, Player, Game, Event, News, Attendance, GameStatus, EventType, EventVisibility } from '@/types';
+import { User, UserRole, Team, Player, Game, Event, News, GameStatus, EventType, EventVisibility } from '@/types';
 
 // Mock data for development without backend
 const mockUsers: User[] = [
@@ -300,13 +300,13 @@ const mockApi = {
     return { success: true, ...obj };
   },
   
-  delete: async (endpoint: string): Promise<unknown> => {
+  delete: async (_endpoint: string): Promise<unknown> => {
     await delay(200);
     return { success: true };
   },
-  
+
   // Auth
-  login: async (email: string, password: string): Promise<{ user: User; access_token: string } | null> => {
+  login: async (email: string, _password: string): Promise<{ user: User; access_token: string } | null> => {
     await delay(500);
     const user = mockUsers.find(u => u.email === email);
     if (!user) {
