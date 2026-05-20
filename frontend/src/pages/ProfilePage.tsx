@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Mail, Phone, Shield, AlertTriangle } from 'lucide-react';
-import { useRole, useAuthStore } from '@/store/authStore';
+import { Mail, Phone, Shield, AlertTriangle, LogOut } from 'lucide-react';
+import { useRole } from '@/store/authStore';
+import { useAuth } from '@/hooks/useAuth';
 import { UserRole } from '@/types';
 import { api } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +12,9 @@ export const ProfilePage = () => {
   const { user, role } = useRole();
   const allRoles = (user?.roles && user.roles.length > 0) ? user.roles : (role ? [role] : []);
   const navigate = useNavigate();
-  const { logout } = useAuthStore();
+  // useAuth().logout also clears the React Query cache and shows a toast;
+  // the store's bare logout would leave query data behind for the next user.
+  const { logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -26,6 +29,11 @@ export const ProfilePage = () => {
       case UserRole.PARENT: return 'Elternteil';
       default: return role;
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const handleDeleteAccount = async () => {
@@ -93,11 +101,19 @@ export const ProfilePage = () => {
             </div>
           </div>
 
-          <button 
+          <button
             onClick={() => setIsEditing(!isEditing)}
             className="btn-primary w-full mt-6"
           >
             Profil bearbeiten
+          </button>
+
+          <button
+            onClick={handleLogout}
+            className="w-full mt-3 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Abmelden
           </button>
         </div>
 
