@@ -67,7 +67,12 @@ def get_teams(
 def create_team(
     team_data: TeamCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_coach)
+    # Admin-only: coaches are assigned to teams by an admin and can only
+    # manage their own (the update/delete endpoints below already enforce
+    # team.coach_id == current_user.id for non-admin coaches). Without this
+    # restriction a coach could bootstrap new teams freely (privilege
+    # escalation caught by the E2E suite).
+    current_user: User = Depends(require_admin)
 ):
     # Validate coach_id if provided
     if team_data.coach_id:

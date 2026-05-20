@@ -61,10 +61,12 @@ class TestUserValidation:
 
 
 class TestTeamValidation:
-    def test_empty_team_name_rejected(self, client, coach_headers):
+    def test_empty_team_name_rejected(self, client, admin_headers):
+        # POST /teams is admin-only; need an admin header or RBAC would
+        # 403 before Pydantic validation runs.
         resp = client.post(
             "/api/v1/teams/",
-            headers=coach_headers,
+            headers=admin_headers,
             json={"name": ""},
         )
         assert resp.status_code == 422

@@ -38,13 +38,14 @@ class TestCoachAccess:
         u = _make_user(db, email="nodelete2@test.com", role=UserRole.PLAYER)
         assert client.delete(f"/api/v1/users/{u.id}", headers=coach_headers).status_code == 403
 
-    def test_coach_can_create_team(self, client, coach_headers):
+    def test_coach_cannot_create_team(self, client, coach_headers):
+        # Team creation is admin-only; coaches manage already-assigned teams.
         resp = client.post(
             "/api/v1/teams/",
             headers=coach_headers,
             json={"name": "Auth Team"},
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 403
 
 
 class TestPlayerAccess:

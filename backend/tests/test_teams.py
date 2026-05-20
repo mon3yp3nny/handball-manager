@@ -22,14 +22,16 @@ class TestGetTeams:
 
 
 class TestCreateTeam:
-    def test_coach_creates_team(self, client, coach_user, coach_headers):
+    def test_coach_cannot_create_team(self, client, coach_user, coach_headers):
+        # Coaches manage their already-assigned teams (update/delete enforce
+        # team.coach_id == current_user.id). Bootstrapping new teams is an
+        # admin-only operation, otherwise any coach could escalate.
         resp = client.post(
             "/api/v1/teams/",
             headers=coach_headers,
             json={"name": "New Team", "age_group": "U14", "coach_id": coach_user.id},
         )
-        assert resp.status_code == 201
-        assert resp.json()["name"] == "New Team"
+        assert resp.status_code == 403
 
     def test_admin_creates_team(self, client, admin_headers):
         resp = client.post(

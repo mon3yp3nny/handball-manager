@@ -13,16 +13,26 @@ class UserRole(str, Enum):
 
 
 # Base schemas
+#
+# email/phone are kept loose on UserBase because this schema is also used
+# in responses (UserResponse, PlayerResponse.user, ...). Strict validation
+# fired on output would crash whenever a legacy row didn't match the
+# current rules — e.g. admin@handball.local trips Pydantic 2's EmailStr
+# because .local is RFC-reserved. Strict checks live on the input-only
+# schemas below.
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
-    phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
+    phone: Optional[str] = None
     role: UserRole = UserRole.PLAYER
 
 
 # Create schemas
 class UserCreate(UserBase):
+    # Strict validation on input only.
+    email: EmailStr
+    phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
     password: str = Field(..., min_length=8, max_length=128)
 
 
@@ -99,6 +109,10 @@ class UserRoleUpdate(BaseModel):
 
 class AdminUserCreate(UserBase):
     """Admin creating user - password optional (can be set later)."""
+    # Strict on input — UserBase is loose to support legacy serialization,
+    # but new users we create here must pass the same checks as UserCreate.
+    email: EmailStr
+    phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
     password: Optional[str] = Field(None, min_length=8, max_length=128)
     is_active: bool = True
     is_verified: bool = True
