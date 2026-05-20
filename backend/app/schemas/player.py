@@ -44,6 +44,14 @@ class PlayerUpdate(BaseModel):
         None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$"
     )
     team_id: Optional[int] = None
+    # Stats: settable only by coach/admin/supervisor — the endpoint
+    # explicitly excludes these fields when a Player calls PUT on
+    # themselves (see api/v1/endpoints/players.py:259). Surfacing them
+    # in the schema means seed scripts and admin tooling can write
+    # them without resorting to direct DB writes.
+    games_played: Optional[int] = Field(None, ge=0)
+    goals_scored: Optional[int] = Field(None, ge=0)
+    assists: Optional[int] = Field(None, ge=0)
 
 
 # Response schemas

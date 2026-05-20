@@ -450,16 +450,21 @@ def seed_games(
     future_count: int,
     base_location_home: str,
     base_location_away: str = "Auswärts",
-) -> None:
+) -> Dict[str, List[int]]:
     """Past games get realistic handball scores (22-32 each side, slight
     home bias). Future games are SCHEDULED with no score yet.
 
     Spacing: one game per week, Saturdays at 18:00 — typical league cadence.
+    Returns {'past': [...], 'future': [...]} so callers can attribute
+    attendance / stats to specific past games.
     """
     saturday_offset = (5 - datetime.utcnow().weekday()) % 7  # next Saturday
     next_sat = datetime.utcnow().replace(hour=18, minute=0, second=0, microsecond=0) + timedelta(days=saturday_offset)
     random.shuffle(opponents)
     op_iter = iter(opponents)
+
+    past_ids: List[int] = []
+    future_ids: List[int] = []
 
     # Past games — walk backwards from last Saturday.
     last_sat = next_sat - timedelta(days=7)
@@ -470,7 +475,7 @@ def seed_games(
         # Slight home-side bias built into the score generator.
         home_score = random.randint(24, 33) if is_home else random.randint(22, 30)
         away_score = random.randint(22, 30) if is_home else random.randint(24, 33)
-        client.create_game(
+        gid = client.create_game(
             team_id=team_id,
             opponent=op,
             location=base_location_home if is_home else f"{base_location_away}: {op}",
@@ -480,13 +485,14 @@ def seed_games(
             home_score=home_score,
             away_score=away_score,
         )
+        past_ids.append(gid)
 
     # Future games.
     for i in range(future_count):
         when = next_sat + timedelta(days=7 * i)
         op = next(op_iter, None) or f"Gast {i + 1}"
         is_home = (i % 2 == 0)
-        client.create_game(
+        gid = client.create_game(
             team_id=team_id,
             opponent=op,
             location=base_location_home if is_home else f"{base_location_away}: {op}",
@@ -494,6 +500,9 @@ def seed_games(
             is_home_game=is_home,
             completed=False,
         )
+        future_ids.append(gid)
+
+    return {"past": past_ids, "future": future_ids}
 
 
 def seed_trainings(
@@ -505,18 +514,25 @@ def seed_trainings(
     past_weeks: int = 4,
     future_weeks: int = 4,
     location: str = "Sporthalle TVF",
-) -> None:
-    """Materialize weekly training instances either side of today."""
-    today = datetime.utcnow().replace(hour=hour, minute=minute, second=0, microsecond=0)
+) -> Dict[str, List[int]]:
+    """Materialize weekly training instances either side of today.
+
+    Returns {'past': [...], 'future': [...]} so callers can backfill
+    attendance for past sessions.
+    """
+    now = datetime.utcnow()
+    today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     today_dow = today.weekday()
 
-    # Build first dates on or after the start of the past window.
+    past_ids: List[int] = []
+    future_ids: List[int] = []
+
     for delta_week in range(-past_weeks, future_weeks + 1):
         for wd in weekdays:
             offset = (wd - today_dow) + 7 * delta_week
             start = today + timedelta(days=offset)
             end = start + timedelta(minutes=90)
-            client.create_event(
+            eid = client.create_event(
                 team_id=team_id,
                 title="Training",
                 start=start,
@@ -525,6 +541,9 @@ def seed_trainings(
                 event_type="training",
                 visibility="team",
             )
+            (past_ids if start < now else future_ids).append(eid)
+
+    return {"past": past_ids, "future": future_ids}
 
 
 def seed(client: HMClient) -> None:
@@ -624,7 +643,9 @@ def seed(client: HMClient) -> None:
         past_count=4, future_count=5,
         base_location_home="Sporthalle TVF",
     )
-    seed_games(
+    # Hold onto the U17 game ids so we can backfill the demo-parent's
+    # child (Finn Albrecht) with attendance for every past one.
+    u17_games = seed_games(
         client, u17m, list(OPPONENTS_NORTH),
         past_count=5, future_count=4,
         base_location_home="Sporthalle TVF",
@@ -636,8 +657,8 @@ def seed(client: HMClient) -> None:
     seed_trainings(client, maenner1, weekdays=[1, 3], hour=20)
     # Damen 1: Mon + Wed, 19:30.
     seed_trainings(client, damen1, weekdays=[0, 2], hour=19, minute=30)
-    # U17 m: Tue + Fri, 18:00.
-    seed_trainings(client, u17m, weekdays=[1, 4], hour=18)
+    # U17 m: Tue + Fri, 18:00 — hold onto past ids for attendance backfill.
+    u17_trainings = seed_trainings(client, u17m, weekdays=[1, 4], hour=18)
 
     # --- club-wide events -----------------------------------------
     today = datetime.utcnow().replace(hour=18, minute=0, second=0, microsecond=0)
@@ -687,7 +708,83 @@ def seed(client: HMClient) -> None:
         published=True,
     )
 
+    # --- Finn Albrecht (eltern's child): stats + past attendance ---
+    print("   demo-parent child history (Finn Albrecht)...")
+    if u17_records:
+        seed_finn_history(
+            client,
+            finn_player_id=u17_records[0]["player_id"],
+            past_game_ids=u17_games["past"],
+            past_training_ids=u17_trainings["past"],
+        )
+
     print("✅ Done.")
+
+
+def seed_finn_history(
+    client: HMClient,
+    finn_player_id: int,
+    past_game_ids: List[int],
+    past_training_ids: List[int],
+) -> None:
+    """Backfill the demo-parent's child with a believable season history.
+
+    - PUT the Player row with stats matching the U17 past-games window:
+      games_played = len(past_game_ids), one keeper-style empty-net goal,
+      two assists from long balls.
+    - POST Attendance for every past game (all PRESENT — he's the
+      starting keeper) and every past training (mostly PRESENT, two
+      EXCUSED to look realistic).
+
+    Everything goes through the API so it survives schema changes the
+    same way the rest of the seed does.
+    """
+    # Stats — admin role can set games_played/goals_scored/assists once
+    # PlayerUpdate exposes them (extended in the same change as this
+    # script). Older deployments without that schema patch will just
+    # ignore the extra fields and the stats stay 0.
+    games_played = len(past_game_ids)
+    stats_body = {
+        "games_played": games_played,
+        "goals_scored": 1 if games_played >= 3 else 0,
+        "assists": min(2, games_played // 2),
+    }
+    r = client.http.put(f"/api/v1/players/{finn_player_id}", json=stats_body)
+    if r.status_code >= 400:
+        print(f"   ⚠️  stats PUT failed ({r.status_code}); deploy backend with the new "
+              f"PlayerUpdate fields first. body={r.text[:200]}")
+
+    # Past-game attendance — keeper always plays.
+    for gid in past_game_ids:
+        try:
+            client.post(
+                "/api/v1/attendance/",
+                {
+                    "player_id": finn_player_id,
+                    "game_id": gid,
+                    "status": "present",
+                    "notes": None,
+                },
+            )
+        except RuntimeError:
+            pass  # uq(player, game) already covered → race-safe no-op.
+
+    # Past-training attendance — mostly present, salt in two excused.
+    excused_indexes = {2, 5} if len(past_training_ids) >= 6 else set()
+    for i, eid in enumerate(past_training_ids):
+        status = "excused" if i in excused_indexes else "present"
+        try:
+            client.post(
+                "/api/v1/attendance/",
+                {
+                    "player_id": finn_player_id,
+                    "event_id": eid,
+                    "status": status,
+                    "notes": "Schule (Klausurwoche)" if status == "excused" else None,
+                },
+            )
+        except RuntimeError:
+            pass
 
 
 # ---------- entrypoint ----------
