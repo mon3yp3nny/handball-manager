@@ -8,6 +8,7 @@ from app.models.attendance import Attendance, AttendanceStatus
 from app.models.game import Game
 from app.models.event import Event
 from app.models.player import Player
+from app.models.team import Team
 from app.schemas.attendance import (
     AttendanceCreate, AttendanceUpdate, AttendanceResponse,
     AttendanceWithPlayer, BulkAttendanceUpdate
@@ -347,14 +348,16 @@ def get_player_attendance_stats(
         if not parent_link:
             raise HTTPException(status_code=403, detail="Not authorized")
     
-    from sqlalchemy import func
-    
+    from sqlalchemy import func, case
+
+    # Postgres rejects sum(boolean); SQLite coerces silently. Wrap each
+    # condition in CASE so the same query works on both dialects.
     stats = db.query(
         Attendance.player_id,
         func.count(Attendance.id).label('total'),
-        func.sum((Attendance.status == AttendanceStatus.PRESENT)).label('present'),
-        func.sum((Attendance.status == AttendanceStatus.ABSENT)).label('absent'),
-        func.sum((Attendance.status == AttendanceStatus.EXCUSED)).label('excused')
+        func.sum(case((Attendance.status == AttendanceStatus.PRESENT, 1), else_=0)).label('present'),
+        func.sum(case((Attendance.status == AttendanceStatus.ABSENT, 1), else_=0)).label('absent'),
+        func.sum(case((Attendance.status == AttendanceStatus.EXCUSED, 1), else_=0)).label('excused'),
     ).filter(Attendance.player_id == player_id).group_by(Attendance.player_id).first()
     
     if not stats:
