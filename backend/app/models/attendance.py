@@ -1,6 +1,7 @@
 from sqlalchemy import Column, DateTime, Integer, ForeignKey, Enum, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -29,7 +30,7 @@ class Attendance(Base):
     status = Column(Enum(AttendanceStatus), default=AttendanceStatus.PENDING)
     notes = Column(String, nullable=True)
     recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    recorded_at = Column(DateTime, default=datetime.utcnow)
+    recorded_at = Column(DateTime, default=utcnow)
     
     # Relationships
     player = relationship("Player", back_populates="attendance_records")

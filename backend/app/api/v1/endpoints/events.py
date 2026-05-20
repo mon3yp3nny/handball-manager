@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_coach_or_supervisor
@@ -81,7 +82,7 @@ def get_events(
         query = query.filter(Event.visibility == visibility)
     
     if upcoming:
-        now = datetime.utcnow()
+        now = utcnow()
         week_later = now + timedelta(days=7)
         query = query.filter(Event.start_time >= now).filter(Event.end_time <= week_later)
     
@@ -214,7 +215,7 @@ def get_event_calendar(
     """Get all events for calendar view with visibility filtering"""
     from app.models.event import Event as EventModel
     
-    now = datetime.utcnow()
+    now = utcnow()
     future = now + timedelta(days=days)
     
     query = db.query(Event).filter(

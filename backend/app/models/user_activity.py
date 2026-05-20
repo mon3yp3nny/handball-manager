@@ -1,6 +1,7 @@
 from sqlalchemy import Column, DateTime, Integer, ForeignKey, String, Text, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -26,7 +27,7 @@ class UserActivity(Base):
     description = Column(Text, nullable=True)
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=utcnow, index=True)
     
     # Relationships
     user = relationship("User", back_populates="activities")

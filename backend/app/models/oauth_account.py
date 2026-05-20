@@ -2,6 +2,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -20,8 +21,8 @@ class OAuthAccount(Base):
     provider_account_id = Column(String, nullable=False, index=True)
     provider_email = Column(String, nullable=True)
     provider_data = Column(String, nullable=True)  # JSON data from provider
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationship
     user = relationship("User", back_populates="oauth_accounts")

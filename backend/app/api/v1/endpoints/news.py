@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime
+from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach_or_supervisor
@@ -167,7 +168,7 @@ def publish_news(
     
     news.is_published = publish_data.is_published
     if publish_data.is_published:
-        news.published_at = datetime.utcnow()
+        news.published_at = utcnow()
     else:
         news.published_at = None
     

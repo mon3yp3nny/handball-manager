@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 from app.db.session import Base
 
 
@@ -15,8 +16,8 @@ class News(Base):
     is_published = Column(Boolean, default=False)
     published_at = Column(DateTime, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     team = relationship("Team", back_populates="news")

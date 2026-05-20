@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
 from datetime import date, datetime, timedelta
+from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_admin
@@ -60,15 +61,15 @@ def get_dashboard_stats(
     
     # Upcoming games (next 30 days)
     upcoming_games = db.query(Game).filter(
-        Game.scheduled_at >= datetime.utcnow(),
-        Game.scheduled_at <= datetime.utcnow() + timedelta(days=30),
+        Game.scheduled_at >= utcnow(),
+        Game.scheduled_at <= utcnow() + timedelta(days=30),
         Game.status.in_(["scheduled", "in_progress"])
     ).count()
     
     # Upcoming events (next 30 days)
     upcoming_events = db.query(Event).filter(
-        Event.start_time >= datetime.utcnow(),
-        Event.start_time <= datetime.utcnow() + timedelta(days=30)
+        Event.start_time >= utcnow(),
+        Event.start_time <= utcnow() + timedelta(days=30)
     ).count()
     
     # Users by role
@@ -76,7 +77,7 @@ def get_dashboard_stats(
     
     # Recent activity (users created in last 7 days)
     recent_users = db.query(User).filter(
-        User.created_at >= datetime.utcnow() - timedelta(days=7)
+        User.created_at >= utcnow() - timedelta(days=7)
     ).count()
     
     return {
@@ -112,7 +113,7 @@ def get_admin_dashboard_summary(
     
     # Recent activity
     recent_users = db.query(User).filter(
-        User.created_at >= datetime.utcnow() - timedelta(days=7)
+        User.created_at >= utcnow() - timedelta(days=7)
     ).count()
     
     # Active games
@@ -137,12 +138,12 @@ def get_admin_dashboard_summary(
         },
         "upcoming": {
             "games_30d": db.query(Game).filter(
-                Game.scheduled_at >= datetime.utcnow(),
-                Game.scheduled_at <= datetime.utcnow() + timedelta(days=30)
+                Game.scheduled_at >= utcnow(),
+                Game.scheduled_at <= utcnow() + timedelta(days=30)
             ).count(),
             "events_30d": db.query(Event).filter(
-                Event.start_time >= datetime.utcnow(),
-                Event.start_time <= datetime.utcnow() + timedelta(days=30)
+                Event.start_time >= utcnow(),
+                Event.start_time <= utcnow() + timedelta(days=30)
             ).count()
         },
         "users_by_role": {str(role): count for role, count in users_by_role},
@@ -173,7 +174,7 @@ def get_dashboard_widgets(
 
     Resolves #129.
     """
-    now = datetime.utcnow()
+    now = utcnow()
     horizon = now + timedelta(days=7)
 
     visible_team_ids = _team_ids_visible_to(db, current_user)
@@ -267,5 +268,5 @@ def get_system_health(
             "status": db_status,
             "healthy": db_healthy
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": utcnow().isoformat()
     }

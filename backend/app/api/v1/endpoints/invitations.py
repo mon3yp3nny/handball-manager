@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, 
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
+from app.utils.time import utcnow
 
 from app.core.config import settings
 from app.core.deps import get_db, get_current_user, require_role
@@ -179,7 +180,7 @@ def resend_invitation(
     # Update expiry and token
     from datetime import datetime, timedelta
     import uuid
-    invitation.expires_at = datetime.utcnow() + timedelta(days=7)
+    invitation.expires_at = utcnow() + timedelta(days=7)
     invitation.token = str(uuid.uuid4())
     db.commit()
 

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Enum, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -38,8 +39,8 @@ class Game(Base):
     # Notes
     notes = Column(String, nullable=True)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     team = relationship("Team", back_populates="games")

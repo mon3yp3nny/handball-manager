@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_coach_or_supervisor
@@ -48,7 +49,7 @@ def get_games(
         query = query.filter(Game.status == status)
     
     if upcoming:
-        now = datetime.utcnow()
+        now = utcnow()
         week_later = now + timedelta(days=7)
         query = query.filter(Game.scheduled_at >= now).filter(Game.scheduled_at <= week_later)
     
@@ -192,7 +193,7 @@ def get_calendar(
     current_user: User = Depends(get_current_user)
 ):
     """Get upcoming games for calendar view"""
-    now = datetime.utcnow()
+    now = utcnow()
     future = now + timedelta(days=days)
     
     query = db.query(Game).filter(

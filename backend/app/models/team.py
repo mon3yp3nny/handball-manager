@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 from app.db.session import Base
 
 
@@ -12,8 +13,8 @@ class Team(Base):
     description = Column(Text, nullable=True)
     age_group = Column(String, nullable=True)  # e.g., "U12", "U14", "Adult"
     coach_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     coach = relationship("User", back_populates="managed_teams")

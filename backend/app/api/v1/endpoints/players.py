@@ -331,7 +331,7 @@ def get_my_schedule(
         raise HTTPException(status_code=404, detail="Player or team not found")
 
     # Get upcoming games
-    now = datetime.utcnow()
+    now = utcnow()
     games = db.query(Game).filter(
         Game.team_id == player.team_id,
         Game.game_time >= now

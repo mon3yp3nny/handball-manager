@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text, Date, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -39,8 +40,8 @@ class Player(Base):
     goals_scored = Column(Integer, default=0)
     assists = Column(Integer, default=0)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     user = relationship("User", back_populates="player_profile")

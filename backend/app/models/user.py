@@ -3,6 +3,7 @@ import json
 from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey, Table, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -40,8 +41,8 @@ class User(Base):
     # headers), so this token IS the credential. Generated lazily on first
     # access; rotate by deleting and re-creating.
     calendar_token = Column(String, unique=True, nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     player_profile = relationship("Player", back_populates="user", uselist=False)

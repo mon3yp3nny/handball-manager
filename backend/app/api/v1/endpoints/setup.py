@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 import json
 from datetime import datetime, timedelta
+from app.utils.time import utcnow
 
 from app.core.deps import get_db
 from app.core import security
@@ -220,7 +221,7 @@ def init_database(
         for game_data in games_data:
             if game_data['team'] in teams_map:
                 team = teams_map[game_data['team']]
-                scheduled = datetime.utcnow() + timedelta(days=game_data['days'])
+                scheduled = utcnow() + timedelta(days=game_data['days'])
                 game = Game(
                     team_id=team.id,
                     opponent=game_data['opponent'],
@@ -255,7 +256,7 @@ def init_database(
             if event_data['team'] and event_data['team'] in teams_map:
                 team_id = teams_map[event_data['team']].id
             
-            start = datetime.utcnow() + timedelta(days=event_data['days'])
+            start = utcnow() + timedelta(days=event_data['days'])
             end = start + timedelta(hours=event_data['hours'])
             
             event = Event(

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
+from app.utils.time import utcnow
 
 from app.core import security
 from app.core.deps import get_db, get_current_user, require_admin, require_coach
@@ -269,7 +270,7 @@ def get_user_stats(
     
     # Recent activity
     recent_activity = db.query(func.count(UserActivity.id)).filter(
-        UserActivity.created_at >= datetime.utcnow() - timedelta(days=7)
+        UserActivity.created_at >= utcnow() - timedelta(days=7)
     ).scalar()
     
     return {

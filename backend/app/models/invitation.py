@@ -2,6 +2,7 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
+from app.utils.time import utcnow
 import enum
 from app.db.session import Base
 
@@ -28,8 +29,8 @@ class Invitation(Base):
     expires_at = Column(DateTime, nullable=False)
     accepted_at = Column(DateTime, nullable=True)
     accepted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     
     # Relationships
     team = relationship("Team", back_populates="invitations")
@@ -39,13 +40,13 @@ class Invitation(Base):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if not self.expires_at:
-            self.expires_at = datetime.utcnow() + timedelta(days=7)
+            self.expires_at = utcnow() + timedelta(days=7)
         if not self.token:
             import uuid
             self.token = str(uuid.uuid4())
     
     def is_expired(self):
-        return self.expires_at < datetime.utcnow() or self.status == InvitationStatus.EXPIRED
+        return self.expires_at < utcnow() or self.status == InvitationStatus.EXPIRED
     
     def __repr__(self):
         return f"<Invitation {self.email} - {self.status}>"
