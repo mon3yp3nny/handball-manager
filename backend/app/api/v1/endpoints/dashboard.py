@@ -7,44 +7,14 @@ from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_admin
+from app.core.permissions import team_ids_visible_to
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
-from app.models.parent_child import ParentChild
 from app.models.game import Game
 from app.models.event import Event
 
 router = APIRouter()
-
-
-def _team_ids_visible_to(db: Session, user: User) -> Optional[List[int]]:
-    """Same RBAC rules used by /events, /games, /calendar.
-
-    Returns None when the user can see everything (admin/supervisor), else
-    a sorted list of team ids. An empty list means "no teams visible".
-    """
-    if user.has_role(UserRole.ADMIN) or user.has_role(UserRole.SUPERVISOR):
-        return None
-
-    team_ids: set[int] = set()
-    if user.has_role(UserRole.COACH):
-        team_ids.update(
-            tid for tid, in db.query(Team.id).filter(Team.coach_id == user.id).all()
-        )
-    if user.has_role(UserRole.PLAYER):
-        player = db.query(Player).filter(Player.user_id == user.id).first()
-        if player and player.team_id is not None:
-            team_ids.add(player.team_id)
-    if user.has_role(UserRole.PARENT):
-        rows = (
-            db.query(Player.team_id)
-            .join(ParentChild, ParentChild.child_id == Player.id)
-            .filter(ParentChild.parent_id == user.id)
-            .distinct()
-            .all()
-        )
-        team_ids.update(tid for tid, in rows if tid is not None)
-    return sorted(team_ids)
 
 
 @router.get("/stats")
@@ -177,7 +147,7 @@ def get_dashboard_widgets(
     now = utcnow()
     horizon = now + timedelta(days=7)
 
-    visible_team_ids = _team_ids_visible_to(db, current_user)
+    visible_team_ids = team_ids_visible_to(db, current_user)
 
     # --- next match ---
     games_q = db.query(Game).filter(

@@ -25,12 +25,10 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_db, get_current_user
+from app.core.permissions import team_ids_visible_to
 from app.models.event import Event, EventVisibility
 from app.models.game import Game
-from app.models.parent_child import ParentChild
-from app.models.player import Player
-from app.models.team import Team
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.services.icalendar import CalEvent, render_calendar
 
 
@@ -53,42 +51,13 @@ def _ensure_token(db: Session, user: User) -> str:
     return user.calendar_token
 
 
-def _team_ids_visible_to(db: Session, user: User) -> List[int]:
-    """Same RBAC rules as /events and /games — kept inline to avoid
-    pulling those endpoints' internals into a service layer for one
-    feature. Admin/supervisor see everything (None signals 'no filter').
-    """
-    if user.has_role(UserRole.ADMIN) or user.has_role(UserRole.SUPERVISOR):
-        return None  # type: ignore[return-value]
-
-    team_ids: set[int] = set()
-    if user.has_role(UserRole.COACH):
-        team_ids.update(
-            tid for tid, in db.query(Team.id).filter(Team.coach_id == user.id).all()
-        )
-    if user.has_role(UserRole.PLAYER):
-        player = db.query(Player).filter(Player.user_id == user.id).first()
-        if player and player.team_id is not None:
-            team_ids.add(player.team_id)
-    if user.has_role(UserRole.PARENT):
-        rows = (
-            db.query(Player.team_id)
-            .join(ParentChild, ParentChild.child_id == Player.id)
-            .filter(ParentChild.parent_id == user.id)
-            .distinct()
-            .all()
-        )
-        team_ids.update(tid for tid, in rows if tid is not None)
-    return sorted(team_ids)
-
-
 def _build_events(db: Session, user: User) -> List[CalEvent]:
     """Collect events + games the user is allowed to see, normalize them."""
     now = datetime.now(timezone.utc)
     window_start = now - _LOOKBACK
     window_end = now + _LOOKAHEAD
 
-    visible_team_ids = _team_ids_visible_to(db, user)
+    visible_team_ids = team_ids_visible_to(db, user)
 
     ev_query = db.query(Event).filter(
         Event.start_time >= window_start,

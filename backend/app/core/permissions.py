@@ -1,8 +1,52 @@
 """Reusable role-based authorization dependencies."""
+from typing import List, Optional
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.deps import get_current_user
 from app.models.user import User, UserRole
+
+
+def team_ids_visible_to(db: Session, user: User) -> Optional[List[int]]:
+    """The set of team ids this user is allowed to see (read-side RBAC).
+
+    Returns:
+        - ``None`` when the user can see every team (admin / supervisor) —
+          callers treat this as "no team filter, skip the IN clause".
+        - A sorted list otherwise; empty list = no visible teams.
+
+    Mirrors the same rules ``can_access_team`` enforces for a single team
+    but answers the inverse (list everything I can see) without an
+    explicit team_id. Used by ``/dashboard/widgets``, ``/calendar``, and
+    other list endpoints that need to filter by team membership; was
+    duplicated as a private ``_team_ids_visible_to`` in two endpoints
+    before (#91).
+    """
+    from app.models.team import Team
+    from app.models.player import Player
+    from app.models.parent_child import ParentChild
+
+    if user.has_role(UserRole.ADMIN) or user.has_role(UserRole.SUPERVISOR):
+        return None
+
+    team_ids: set[int] = set()
+    if user.has_role(UserRole.COACH):
+        team_ids.update(
+            tid for tid, in db.query(Team.id).filter(Team.coach_id == user.id).all()
+        )
+    if user.has_role(UserRole.PLAYER):
+        player = db.query(Player).filter(Player.user_id == user.id).first()
+        if player and player.team_id is not None:
+            team_ids.add(player.team_id)
+    if user.has_role(UserRole.PARENT):
+        rows = (
+            db.query(Player.team_id)
+            .join(ParentChild, ParentChild.child_id == Player.id)
+            .filter(ParentChild.parent_id == user.id)
+            .distinct()
+            .all()
+        )
+        team_ids.update(tid for tid, in rows if tid is not None)
+    return sorted(team_ids)
 
 
 def can_access_team(user: User, team_id: int, db: Session) -> bool:
