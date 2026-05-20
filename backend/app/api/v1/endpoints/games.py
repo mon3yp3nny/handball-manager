@@ -35,12 +35,12 @@ def get_games(
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
+        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
         query = query.filter(Game.team_id.in_(child_team_ids))
     elif current_user.has_role(UserRole.COACH):
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
+        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
         query = query.filter(Game.team_id.in_(coach_team_ids))
-    
+
     if team_id:
         query = query.filter(Game.team_id == team_id)
     
@@ -209,11 +209,11 @@ def get_calendar(
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
+        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
         query = query.filter(Game.team_id.in_(child_team_ids))
     elif current_user.has_role(UserRole.COACH):
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
+        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
         query = query.filter(Game.team_id.in_(coach_team_ids))
-    
+
     games = query.order_by(Game.scheduled_at).all()
     return games

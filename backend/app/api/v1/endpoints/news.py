@@ -37,15 +37,15 @@ def get_news(
         from app.models.parent_child import ParentChild
         child_team_ids = db.query(Player.team_id).join(
             ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
+        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
         query = query.filter(
             (News.team_id.in_(child_team_ids)) | (News.team_id.is_(None))
         )
     elif current_user.role == UserRole.COACH:
         # Coaches see their team news + global + their own drafts
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
+        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
         query = query.filter(
-            (News.team_id.in_(coach_team_ids)) | 
+            (News.team_id.in_(coach_team_ids)) |
             (News.team_id.is_(None)) |
             (News.author_id == current_user.id)
         )

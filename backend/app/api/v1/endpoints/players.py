@@ -38,14 +38,14 @@ def get_players(
             query = query.filter(Player.team_id == current_player.team_id)
     elif current_user.has_role(UserRole.PARENT):
         # Parents see their children and their teammates
-        child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
-        child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_ids)).subquery()
+        child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).scalar_subquery()
+        child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_ids)).scalar_subquery()
         query = query.filter(
             (Player.id.in_(child_ids)) | (Player.team_id.in_(child_team_ids))
         )
     elif current_user.has_role(UserRole.COACH):
         # Coaches see players in their teams
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).subquery()
+        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
         query = query.filter(Player.team_id.in_(coach_team_ids))
 
     if team_id:

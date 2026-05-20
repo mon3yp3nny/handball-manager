@@ -44,7 +44,7 @@ def can_access_team(user: User, team_id: int, db: Session) -> bool:
         child_player_ids = (
             db.query(ParentChild.child_id)
             .filter(ParentChild.parent_id == user.id)
-            .subquery()
+            .scalar_subquery()
         )
         match = (
             db.query(Player.id)
