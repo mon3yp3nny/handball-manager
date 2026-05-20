@@ -11,6 +11,7 @@ from app.models.oauth_account import OAuthAccount, OAuthProvider
 from app.models.invitation import Invitation, InvitationStatus
 from app.models.user_activity import UserActivity, ActivityType
 from app.models.player_availability import PlayerAvailability, AvailabilityReason
+from app.models.match_report import MatchReport
 
 __all__ = [
     "Base",
@@ -37,4 +38,5 @@ __all__ = [
     "ActivityType",
     "PlayerAvailability",
     "AvailabilityReason",
+    "MatchReport",
 ]
