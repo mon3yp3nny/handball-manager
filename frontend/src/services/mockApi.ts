@@ -288,13 +288,13 @@ const mockApi = {
     return {};
   },
   
-  post: async (endpoint: string, data: unknown): Promise<unknown> => {
+  post: async (_endpoint: string, data: unknown): Promise<unknown> => {
     await delay(200);
     const obj = typeof data === 'object' && data !== null ? data : {};
     return { success: true, ...obj, id: Math.random().toString() };
   },
-  
-  patch: async (endpoint: string, data: unknown): Promise<unknown> => {
+
+  patch: async (_endpoint: string, data: unknown): Promise<unknown> => {
     await delay(200);
     const obj = typeof data === 'object' && data !== null ? data : {};
     return { success: true, ...obj };
