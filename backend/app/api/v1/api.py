@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, oauth, users, teams, players, games, events, attendance, news, parents, invitations, health, migrations, dashboard, setup, calendar
+from app.api.v1.endpoints import auth, oauth, users, teams, players, games, events, attendance, news, parents, invitations, health, migrations, dashboard, setup, calendar, availability
 
 api_router = APIRouter()
 
@@ -20,3 +20,5 @@ api_router.include_router(migrations.router, prefix="/migrations", tags=["Migrat
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 api_router.include_router(setup.router, prefix="/setup", tags=["Setup"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["Calendar"])
+# Availability is keyed by player_id, so it lives under /players/{id}/availability.
+api_router.include_router(availability.router, tags=["Availability"])
