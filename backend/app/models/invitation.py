@@ -21,13 +21,13 @@ class Invitation(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     role = Column(String, nullable=False)  # player, parent
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
-    invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
+    invited_by = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     status = Column(Enum(InvitationStatus), default=InvitationStatus.PENDING, nullable=False)
     token = Column(String, unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False)
     accepted_at = Column(DateTime, nullable=True)
-    accepted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    accepted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

@@ -15,7 +15,7 @@ class OAuthAccount(Base):
     __tablename__ = "oauth_accounts"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     provider = Column(Enum(OAuthProvider), nullable=False)
     provider_account_id = Column(String, nullable=False, index=True)
     provider_email = Column(String, nullable=True)

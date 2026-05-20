@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text, Date, Enum
+from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text, Date, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -18,10 +18,16 @@ class Position(str, enum.Enum):
 
 class Player(Base):
     __tablename__ = "players"
-    
+    # No two players on the same team share a jersey number. jersey_number is
+    # nullable; NULLs are distinct in UNIQUE on both Postgres and SQLite, so
+    # players without a number coexist freely.
+    __table_args__ = (
+        UniqueConstraint("team_id", "jersey_number", name="uq_players_team_jersey"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)
     jersey_number = Column(Integer, nullable=True)
     position = Column(Enum(Position, name="player_position"), nullable=True)
     date_of_birth = Column(Date, nullable=True)

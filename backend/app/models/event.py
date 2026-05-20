@@ -25,7 +25,7 @@ class Event(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # Nullable for club-wide events
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)  # Nullable for club-wide events
     event_type = Column(Enum(EventType), default=EventType.TRAINING)
     visibility = Column(Enum(EventVisibility), default=EventVisibility.TEAM)
     location = Column(String, nullable=True)

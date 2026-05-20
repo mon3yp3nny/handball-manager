@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, Integer, ForeignKey, Enum, String
+from sqlalchemy import Column, DateTime, Integer, ForeignKey, Enum, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -14,14 +14,21 @@ class AttendanceStatus(str, enum.Enum):
 
 class Attendance(Base):
     __tablename__ = "attendance"
-    
+    # One attendance row per (player, game) or (player, event). NULL in the
+    # other FK is treated as DISTINCT by both Postgres and SQLite, so a single
+    # composite UNIQUE is enough — we don't need partial indexes.
+    __table_args__ = (
+        UniqueConstraint("player_id", "game_id", name="uq_attendance_player_game"),
+        UniqueConstraint("player_id", "event_id", name="uq_attendance_player_event"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer, ForeignKey("players.id"), nullable=False)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=True)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=True)
+    player_id = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+    game_id = Column(Integer, ForeignKey("games.id"), nullable=True, index=True)
+    event_id = Column(Integer, ForeignKey("events.id"), nullable=True, index=True)
     status = Column(Enum(AttendanceStatus), default=AttendanceStatus.PENDING)
     notes = Column(String, nullable=True)
-    recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     recorded_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

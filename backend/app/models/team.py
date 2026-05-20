@@ -11,7 +11,7 @@ class Team(Base):
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     age_group = Column(String, nullable=True)  # e.g., "U12", "U14", "Adult"
-    coach_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    coach_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

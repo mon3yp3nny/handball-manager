@@ -23,7 +23,7 @@ class Game(Base):
     __tablename__ = "games"
     
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
     opponent = Column(String, nullable=False)
     location = Column(String, nullable=False)
     scheduled_at = Column(DateTime, nullable=False)

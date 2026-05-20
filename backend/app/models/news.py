@@ -10,8 +10,8 @@ class News(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)  # Null = global news
-    author_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)  # Null = global news
+    author_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     is_published = Column(Boolean, default=False)
     published_at = Column(DateTime, nullable=True)
     
