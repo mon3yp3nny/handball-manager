@@ -5,6 +5,7 @@ import { UserRole } from '@/types';
 import { api } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { CalendarSubscription } from '@/components/CalendarSubscription';
 
 export const ProfilePage = () => {
   const { user, role } = useRole();
@@ -102,12 +103,8 @@ export const ProfilePage = () => {
 
         {/* Settings Card */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Activity Card */}
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4">Aktivität</h2>
-            
-            <p className="text-gray-500">Hier werden zukünftig Ihre Aktivitäten angezeigt.</p>
-          </div>
+          {/* Calendar subscription */}
+          <CalendarSubscription />
 
           {/* Danger Zone */}
           <div className="card p-6 border-red-200">

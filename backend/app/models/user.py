@@ -35,6 +35,11 @@ class User(Base):
     # JSON list of role values (e.g. '["coach","player","parent"]'). Holds the
     # full multi-role assignment; `role` above is the primary/legacy single role.
     roles_data = Column(Text, nullable=True)
+    # Per-user secret token for the iCalendar (.ics) subscription URL. The
+    # calendar endpoint is bearerless (calendar apps don't send Authorization
+    # headers), so this token IS the credential. Generated lazily on first
+    # access; rotate by deleting and re-creating.
+    calendar_token = Column(String, unique=True, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
