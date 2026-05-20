@@ -49,25 +49,25 @@ def create_user(
             detail="Email already registered"
         )
     
-    # Create user
+    # Create user + (optional) player profile atomically — previously the
+    # User was committed before the Player insert, so a failure in the
+    # second commit left the row orphaned with no profile (#94). Single
+    # commit means we either get both or neither.
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         phone=user_data.phone,
-        role=user_data.role
+        role=user_data.role,
     )
     db.add(db_user)
+    db.flush()  # assigns db_user.id without committing
+    if user_data.role == UserRole.PLAYER:
+        db.add(Player(user_id=db_user.id))
     db.commit()
     db.refresh(db_user)
-    
-    # Create player profile if role is PLAYER
-    if user_data.role == UserRole.PLAYER:
-        player = Player(user_id=db_user.id)
-        db.add(player)
-        db.commit()
-    
+
     return db_user
 
 
@@ -288,14 +288,14 @@ def bulk_activate_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
-    """Bulk activate multiple users"""
-    updated = 0
-    for user_id in user_ids:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and not user.is_active:
-            user.is_active = True
-            updated += 1
-    
+    """Bulk activate multiple users (#103 — single UPDATE, no N+1)."""
+    if not user_ids:
+        return {"message": "Activated 0 users"}
+    updated = (
+        db.query(User)
+        .filter(User.id.in_(user_ids), User.is_active.is_(False))
+        .update({"is_active": True}, synchronize_session=False)
+    )
     db.commit()
     return {"message": f"Activated {updated} users"}
 
@@ -306,13 +306,13 @@ def bulk_deactivate_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
-    """Bulk deactivate multiple users"""
-    updated = 0
-    for user_id in user_ids:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and user.is_active:
-            user.is_active = False
-            updated += 1
-    
+    """Bulk deactivate multiple users (#103 — single UPDATE, no N+1)."""
+    if not user_ids:
+        return {"message": "Deactivated 0 users"}
+    updated = (
+        db.query(User)
+        .filter(User.id.in_(user_ids), User.is_active.is_(True))
+        .update({"is_active": False}, synchronize_session=False)
+    )
     db.commit()
     return {"message": f"Deactivated {updated} users"}

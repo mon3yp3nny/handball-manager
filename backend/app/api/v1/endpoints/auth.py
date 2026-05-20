@@ -46,6 +46,9 @@ def register(
             detail="Email already registered"
         )
 
+    # Register user + (optional) player profile atomically (#94). Flush to
+    # get db_user.id without committing, attach the Player in the same
+    # session, single final commit means we either get both or neither.
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
@@ -53,17 +56,14 @@ def register(
         last_name=user_data.last_name,
         phone=user_data.phone,
         role=user_data.role,
-        is_verified=True
+        is_verified=True,
     )
     db.add(db_user)
+    db.flush()
+    if user_data.role == UserRole.PLAYER:
+        db.add(Player(user_id=db_user.id))
     db.commit()
     db.refresh(db_user)
-
-    # Create player profile if role is PLAYER
-    if user_data.role == UserRole.PLAYER:
-        player = Player(user_id=db_user.id)
-        db.add(player)
-        db.commit()
 
     # Log activity
     from app.models.user_activity import UserActivity, ActivityType
