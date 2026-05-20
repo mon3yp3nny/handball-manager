@@ -1,7 +1,7 @@
 #!/bin/bash
 # Deploy script for Handball Manager to Google Cloud Run
 
-set -e
+set -euo pipefail
 
 PROJECT_ID="handball-club-manager"
 REGION="europe-west1"
@@ -36,10 +36,12 @@ gcloud run deploy handball-backend \
   --cpu 1
 
 # Build and push frontend
+# VITE_API_URL (and any other VITE_* vars) are baked at build time via the
+# frontend Dockerfile's ARGs. The Dockerfile has sensible defaults pointing at
+# the live backend service; override here only if a different target is needed.
 echo "📦 Building frontend..."
 cd frontend
-gcloud builds submit --project ${PROJECT_ID} --tag ${FRONTEND_IMAGE}:latest \
-  --substitutions=_VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app,_VITE_GOOGLE_CLIENT_ID=,VITE_APPLE_CLIENT_ID= .
+gcloud builds submit --project ${PROJECT_ID} --tag ${FRONTEND_IMAGE}:latest .
 cd ..
 
 echo "🚀 Deploying frontend to Cloud Run..."
