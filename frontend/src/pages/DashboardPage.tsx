@@ -4,6 +4,7 @@ import { api } from '@/services/api';
 import { useRole } from '@/store/authStore';
 import { Game, Event } from '@/types';
 import { ParentDashboard } from './Family/ParentDashboard';
+import { HighlightWidgets } from '@/components/dashboard/HighlightWidgets';
 
 export const DashboardPage = () => {
   const { user, isParent } = useRole();
@@ -56,6 +57,9 @@ export const DashboardPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Forward-looking highlight widgets (next match + birthdays) */}
+      <HighlightWidgets />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

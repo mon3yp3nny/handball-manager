@@ -2,16 +2,48 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func, text
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_admin
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
+from app.models.parent_child import ParentChild
 from app.models.game import Game
 from app.models.event import Event
 
 router = APIRouter()
+
+
+def _team_ids_visible_to(db: Session, user: User) -> Optional[List[int]]:
+    """Same RBAC rules used by /events, /games, /calendar.
+
+    Returns None when the user can see everything (admin/supervisor), else
+    a sorted list of team ids. An empty list means "no teams visible".
+    """
+    if user.has_role(UserRole.ADMIN) or user.has_role(UserRole.SUPERVISOR):
+        return None
+
+    team_ids: set[int] = set()
+    if user.has_role(UserRole.COACH):
+        team_ids.update(
+            tid for tid, in db.query(Team.id).filter(Team.coach_id == user.id).all()
+        )
+    if user.has_role(UserRole.PLAYER):
+        player = db.query(Player).filter(Player.user_id == user.id).first()
+        if player and player.team_id is not None:
+            team_ids.add(player.team_id)
+    if user.has_role(UserRole.PARENT):
+        rows = (
+            db.query(Player.team_id)
+            .join(ParentChild, ParentChild.child_id == Player.id)
+            .filter(ParentChild.parent_id == user.id)
+            .distinct()
+            .all()
+        )
+        team_ids.update(tid for tid, in rows if tid is not None)
+    return sorted(team_ids)
 
 
 @router.get("/stats")
@@ -122,6 +154,98 @@ def get_admin_dashboard_summary(
             "players_without_team": players_without_team,
             "active_games": active_games
         }
+    }
+
+
+@router.get("/widgets")
+def get_dashboard_widgets(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Forward-looking dashboard widgets — RBAC-scoped to what the user sees.
+
+    Returns:
+      - `next_match`: nearest upcoming Game in the user's visible teams,
+        or null when there are none.
+      - `upcoming_birthdays`: players whose date_of_birth's MONTH/DAY falls
+        in the next 7 days (year-crossing handled). Visible only for
+        players the user could already see on /players.
+
+    Resolves #129.
+    """
+    now = datetime.utcnow()
+    horizon = now + timedelta(days=7)
+
+    visible_team_ids = _team_ids_visible_to(db, current_user)
+
+    # --- next match ---
+    games_q = db.query(Game).filter(
+        Game.scheduled_at >= now,
+        Game.status.in_(["scheduled", "in_progress"]),
+    )
+    if visible_team_ids is not None:
+        if not visible_team_ids:
+            next_match_payload = None
+            games_q = None  # short-circuit
+        else:
+            games_q = games_q.filter(Game.team_id.in_(visible_team_ids))
+
+    next_match_payload = None
+    if games_q is not None:
+        nm = games_q.order_by(Game.scheduled_at.asc()).first()
+        if nm:
+            next_match_payload = {
+                "id": nm.id,
+                "team_id": nm.team_id,
+                "opponent": nm.opponent,
+                "location": nm.location,
+                "scheduled_at": nm.scheduled_at.isoformat() if nm.scheduled_at else None,
+                "is_home_game": nm.is_home_game,
+            }
+
+    # --- upcoming birthdays (next 7 days) ---
+    players_q = db.query(Player).filter(Player.date_of_birth.isnot(None))
+    if visible_team_ids is not None:
+        if not visible_team_ids:
+            players = []
+        else:
+            players = players_q.filter(Player.team_id.in_(visible_team_ids)).all()
+    else:
+        players = players_q.all()
+
+    upcoming: list[dict] = []
+    today = now.date()
+    for p in players:
+        dob: date = p.date_of_birth
+        # Next-occurrence date this year; bump to next year if already past.
+        try:
+            nbd = dob.replace(year=today.year)
+        except ValueError:
+            # Feb 29 in a non-leap year — fall back to Feb 28.
+            nbd = dob.replace(year=today.year, day=28)
+        if nbd < today:
+            try:
+                nbd = dob.replace(year=today.year + 1)
+            except ValueError:
+                nbd = dob.replace(year=today.year + 1, day=28)
+        days_until = (nbd - today).days
+        if 0 <= days_until <= 7:
+            upcoming.append(
+                {
+                    "player_id": p.id,
+                    "team_id": p.team_id,
+                    "first_name": (p.user.first_name if p.user else None),
+                    "last_name": (p.user.last_name if p.user else None),
+                    "date_of_birth": dob.isoformat(),
+                    "days_until": days_until,
+                    "turning": nbd.year - dob.year,
+                }
+            )
+    upcoming.sort(key=lambda x: x["days_until"])
+
+    return {
+        "next_match": next_match_payload,
+        "upcoming_birthdays": upcoming,
     }
 
 
