@@ -5,6 +5,7 @@ from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach_or_supervisor
+from app.core.permissions import can_access_team, team_ids_visible_to
 from app.models.user import User, UserRole
 from app.models.news import News
 from app.models.team import Team
@@ -25,31 +26,19 @@ def get_news(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(News)
-    
-    # Role-based filtering
-    if current_user.role == UserRole.PLAYER:
-        current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if current_player:
-            # Players see team news and global news
-            query = query.filter(
-                ((News.team_id == current_player.team_id) | (News.team_id.is_(None)))
-            )
-    elif current_user.role == UserRole.PARENT:
-        from app.models.parent_child import ParentChild
-        child_team_ids = db.query(Player.team_id).join(
-            ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
-        query = query.filter(
-            (News.team_id.in_(child_team_ids)) | (News.team_id.is_(None))
-        )
-    elif current_user.role == UserRole.COACH:
-        # Coaches see their team news + global + their own drafts
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
-        query = query.filter(
-            (News.team_id.in_(coach_team_ids)) |
-            (News.team_id.is_(None)) |
-            (News.author_id == current_user.id)
-        )
+
+    # Global news (team_id IS NULL) is visible to everyone; team news
+    # uses the same visibility rule as the rest of the API. Coaches
+    # additionally see their own drafts (rows they authored).
+    visible_team_ids = team_ids_visible_to(db, current_user)
+    if visible_team_ids is not None:
+        from sqlalchemy import or_
+        clauses = [News.team_id.is_(None)]
+        if visible_team_ids:
+            clauses.append(News.team_id.in_(visible_team_ids))
+        if current_user.has_role(UserRole.COACH):
+            clauses.append(News.author_id == current_user.id)
+        query = query.filter(or_(*clauses))
     
     if team_id:
         query = query.filter(News.team_id == team_id)
@@ -106,20 +95,10 @@ def get_news_item(
         if current_user.role not in [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR]:
             raise HTTPException(status_code=403, detail="News not yet published")
     
-    # Authorization based on team visibility
-    if news.team_id:
-        if current_user.role == UserRole.PLAYER:
-            current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-            if current_player and news.team_id != current_player.team_id:
-                raise HTTPException(status_code=403, detail="Not authorized")
-        elif current_user.role == UserRole.PARENT:
-            from app.models.parent_child import ParentChild
-            child_team_ids = db.query(Player.team_id).join(
-                ParentChild, ParentChild.child_id == Player.id
-            ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
-            if news.team_id not in [tid for tid, in db.query(child_team_ids).all()]:
-                raise HTTPException(status_code=403, detail="Not authorized")
-    
+    # Team-scoped news uses the canonical can_access_team predicate.
+    if news.team_id is not None and not can_access_team(current_user, news.team_id, db):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     return news
 
 

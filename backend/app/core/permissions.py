@@ -1,8 +1,6 @@
 """Reusable role-based authorization dependencies."""
 from typing import List, Optional
-from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from app.core.deps import get_current_user
 from app.models.user import User, UserRole
 
 
@@ -101,23 +99,9 @@ def can_access_team(user: User, team_id: int, db: Session) -> bool:
     return False
 
 
-def require_roles(*roles: UserRole):
-    """FastAPI dependency that restricts access to the given roles.
-
-    Usage::
-
-        @router.get("/admin-only")
-        def admin_view(user: User = Depends(require_roles(UserRole.ADMIN))):
-            ...
-    """
-    allowed = set(roles)
-
-    def _checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required roles: {[r.value for r in allowed]}",
-            )
-        return current_user
-
-    return _checker
+# `require_roles(...)` lived here but was dead code — no endpoint imported
+# it — and its singular-role check was broken for multi-role users (max
+# mustermann is coach+player+parent; only one of those would match
+# `current_user.role`). The canonical dependency is `require_role([...])`
+# in `core/deps.py` which uses `has_any_role()` and is multi-role aware.
+# Removed per #91 — see commit history for the prior shape.

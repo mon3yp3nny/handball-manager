@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.deps import get_db, get_current_user, require_admin, require_coach, require_coach_or_supervisor
-from app.core.permissions import can_access_team
+from app.core.permissions import can_access_team, team_ids_visible_to
 from app.models.user import User, UserRole
 from app.models.team import Team
 from app.models.player import Player
@@ -27,29 +27,22 @@ def get_teams(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Team)
-    
-    # Filter by role - Admin and Supervisor see all teams
-    if current_user.has_role(UserRole.ADMIN) or current_user.has_role(UserRole.SUPERVISOR):
-        # Admin and Supervisor see all teams - no filter needed
-        pass
-    elif current_user.has_role(UserRole.COACH):
-        # Coaches see teams they manage
-        query = query.filter(Team.coach_id == current_user.id)
-    elif current_user.has_role(UserRole.PLAYER):
-        # Players see only their team
-        player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if player and player.team_id:
-            query = query.filter(Team.id == player.team_id)
-        else:
-            # Player not assigned to any team - show empty list or all teams for discovery
-            # For now, show all teams so they can find a team to join
+
+    # Same RBAC as every other list endpoint. One quirk preserved from
+    # the previous shape: a Player without a team assignment sees all
+    # teams (so they can discover one to join) rather than an empty
+    # list. team_ids_visible_to returns an empty list for that case;
+    # detect it and skip the filter.
+    visible_team_ids = team_ids_visible_to(db, current_user)
+    if visible_team_ids is not None:
+        if visible_team_ids:
+            query = query.filter(Team.id.in_(visible_team_ids))
+        elif current_user.has_role(UserRole.PLAYER):
+            # Discovery for unassigned players — no filter.
             pass
-    elif current_user.has_role(UserRole.PARENT):
-        # Parents see teams of their children
-        from app.models.parent_child import ParentChild
-        child_player_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).subquery()
-        child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_player_ids)).subquery()
-        query = query.filter(Team.id.in_(child_team_ids))
+        else:
+            query = query.filter(False)
+
     if age_group:
         query = query.filter(Team.age_group == age_group)
 

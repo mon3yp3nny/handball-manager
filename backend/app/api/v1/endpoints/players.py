@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_admin
+from app.core.permissions import team_ids_visible_to
 from app.core.security import get_password_hash
 from app.utils.time import utcnow
 from app.models.user import User, UserRole
@@ -31,23 +32,27 @@ def get_players(
 ):
     query = db.query(Player).join(User, Player.user_id == User.id)
 
-    # Role-based filtering
-    if current_user.has_role(UserRole.PLAYER):
-        # Players see themselves and teammates
-        current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if current_player and current_player.team_id:
-            query = query.filter(Player.team_id == current_player.team_id)
-    elif current_user.has_role(UserRole.PARENT):
-        # Parents see their children and their teammates
-        child_ids = db.query(ParentChild.child_id).filter(ParentChild.parent_id == current_user.id).scalar_subquery()
-        child_team_ids = db.query(Player.team_id).filter(Player.id.in_(child_ids)).scalar_subquery()
-        query = query.filter(
-            (Player.id.in_(child_ids)) | (Player.team_id.in_(child_team_ids))
-        )
-    elif current_user.has_role(UserRole.COACH):
-        # Coaches see players in their teams
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
-        query = query.filter(Player.team_id.in_(coach_team_ids))
+    # Team visibility via the central helper. Parents have one extra
+    # wrinkle: their child might have NO team yet (team_id IS NULL),
+    # which team_ids_visible_to wouldn't surface — so OR in
+    # "Player.id IN children" for parents specifically.
+    visible_team_ids = team_ids_visible_to(db, current_user)
+    if visible_team_ids is not None:
+        from sqlalchemy import or_
+        clauses = []
+        if visible_team_ids:
+            clauses.append(Player.team_id.in_(visible_team_ids))
+        if current_user.has_role(UserRole.PARENT):
+            child_ids = (
+                db.query(ParentChild.child_id)
+                .filter(ParentChild.parent_id == current_user.id)
+                .scalar_subquery()
+            )
+            clauses.append(Player.id.in_(child_ids))
+        if clauses:
+            query = query.filter(or_(*clauses))
+        else:
+            query = query.filter(False)
 
     if team_id:
         query = query.filter(Player.team_id == team_id)

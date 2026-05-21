@@ -5,7 +5,7 @@ from app.utils.time import utcnow
 from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_coach_or_supervisor
-from app.core.permissions import can_access_team
+from app.core.permissions import can_access_team, team_ids_visible_to
 from app.models.user import User, UserRole
 from app.models.game import Game, GameStatus, GameType
 from app.models.team import Team
@@ -29,21 +29,13 @@ def get_games(
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Game).join(Team, Game.team_id == Team.id)
-    
-    # Role-based filtering
-    if current_user.has_role(UserRole.PLAYER):
-        current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if current_player and current_player.team_id:
-            query = query.filter(Game.team_id == current_player.team_id)
-    elif current_user.has_role(UserRole.PARENT):
-        from app.models.parent_child import ParentChild
-        child_team_ids = db.query(Player.team_id).join(
-            ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
-        query = query.filter(Game.team_id.in_(child_team_ids))
-    elif current_user.has_role(UserRole.COACH):
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
-        query = query.filter(Game.team_id.in_(coach_team_ids))
+
+    # Same RBAC as every other list endpoint (#91) — centralized.
+    visible_team_ids = team_ids_visible_to(db, current_user)
+    if visible_team_ids is not None:
+        # None = admin/supervisor → no filter. Empty list = user has no
+        # visible team → return no rows.
+        query = query.filter(Game.team_id.in_(visible_team_ids)) if visible_team_ids else query.filter(False)
 
     if team_id:
         query = query.filter(Game.team_id == team_id)
@@ -99,20 +91,12 @@ def get_game(
     game = db.query(Game).filter(Game.id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
-    
-    # Authorization check
-    if current_user.has_role(UserRole.PLAYER):
-        current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if current_player and game.team_id != current_player.team_id:
-            raise HTTPException(status_code=403, detail="Not authorized")
-    elif current_user.has_role(UserRole.PARENT):
-        from app.models.parent_child import ParentChild
-        child_team_ids = db.query(Player.team_id).join(
-            ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().subquery()
-        if game.team_id not in [tid for tid, in db.query(child_team_ids).all()]:
-            raise HTTPException(status_code=403, detail="Not authorized")
-    
+    # Single-team check → can_access_team — same predicate as the
+    # team-detail and WS-subscribe endpoints. Replaces three hand-rolled
+    # role branches with one call.
+    if not can_access_team(current_user, game.team_id, db):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
     return game
 
 
@@ -201,23 +185,12 @@ def get_calendar(
     
     query = db.query(Game).filter(
         Game.scheduled_at >= now,
-        Game.scheduled_at <= future
+        Game.scheduled_at <= future,
     )
-    
-    # Filter by role
-    if current_user.has_role(UserRole.PLAYER):
-        current_player = db.query(Player).filter(Player.user_id == current_user.id).first()
-        if current_player and current_player.team_id:
-            query = query.filter(Game.team_id == current_player.team_id)
-    elif current_user.has_role(UserRole.PARENT):
-        from app.models.parent_child import ParentChild
-        child_team_ids = db.query(Player.team_id).join(
-            ParentChild, ParentChild.child_id == Player.id
-        ).filter(ParentChild.parent_id == current_user.id).distinct().scalar_subquery()
-        query = query.filter(Game.team_id.in_(child_team_ids))
-    elif current_user.has_role(UserRole.COACH):
-        coach_team_ids = db.query(Team.id).filter(Team.coach_id == current_user.id).scalar_subquery()
-        query = query.filter(Game.team_id.in_(coach_team_ids))
+
+    visible_team_ids = team_ids_visible_to(db, current_user)
+    if visible_team_ids is not None:
+        query = query.filter(Game.team_id.in_(visible_team_ids)) if visible_team_ids else query.filter(False)
 
     games = query.order_by(Game.scheduled_at).all()
     return games
