@@ -14,7 +14,16 @@ class MatchReport(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=False, index=True)
+    # ON DELETE CASCADE: when a Game is deleted (e.g. by the team-delete
+    # bulk path), the report goes with it. Without this, deleting a team
+    # whose games have reports throws a 500 from the FK constraint and
+    # the team gets stranded.
+    game_id = Column(
+        Integer,
+        ForeignKey("games.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     author_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     # Plain markdown — the schema layer caps length; rendering is the
     # frontend's problem (we never inject this into HTML server-side).

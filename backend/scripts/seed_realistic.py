@@ -358,8 +358,15 @@ def wipe(client: HMClient) -> None:
 
     teams = client.get_all("/api/v1/teams/", page_size=200)
     print(f"   teams: {len(teams)}")
+    failed_team_ids: List[int] = []
     for t in teams:
-        client.delete(f"/api/v1/teams/{t['id']}")
+        if not client.delete(f"/api/v1/teams/{t['id']}"):
+            failed_team_ids.append(t["id"])
+    if failed_team_ids:
+        # Surface what didn't get cleaned — silent failures had left
+        # ghost teams behind in earlier runs (missing CASCADE on
+        # match_reports.game_id, since fixed in migration 008).
+        print(f"   ⚠️  team deletes failed for ids: {failed_team_ids}")
 
     # Team DELETE nulls each player's team_id rather than deleting the
     # player row, so iterations leave a growing pile of orphan player
@@ -569,14 +576,15 @@ def seed(client: HMClient) -> None:
 
     # --- supervisor -----------------------------------------------
     # The role exists in the codebase but had no seeded account, so the
-    # "Betreuer" demo flow couldn't be tried. Adding a canonical login
-    # alongside the other demo creds.
+    # "Betreuer" demo flow couldn't be tried. Using a fresh @tvfischbek.de
+    # address (rather than supervisor@handball.de) so we don't collide
+    # with a legacy row whose stored password we can't reset via the API.
     client.create_user(
-        "supervisor@handball.de",
+        "betreuer.schubert@tvfischbek.de",
         "Sabine",
         "Schubert",
         "supervisor",
-        password="super123",
+        password="Test123!",
     )
 
     # --- teams -----------------------------------------------------
