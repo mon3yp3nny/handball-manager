@@ -95,7 +95,14 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         />
       )}
 
-      {/* Sidebar — dark navy with subtle diagonal stripe texture */}
+      {/* Sidebar — dark navy with subtle diagonal stripe texture.
+          `fixed md:sticky` is the position; do NOT add `relative` to this
+          className — Tailwind's generated CSS has .relative AFTER .fixed,
+          so adding it here would silently turn off `fixed` (the nav would
+          take 100vh of layout space at the top of the page and push every
+          mobile route a full viewport down). The `tvf-stripes-overlay`
+          class uses position:absolute on ::before, which works fine with
+          `fixed` or `sticky` as the containing block. */}
       <nav
         className={`
           tvf-stripes-overlay
@@ -103,7 +110,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           w-64 h-screen bg-tvf-navy text-tvf-ink-on-navy
           border-r border-tvf-navy-deep
           transition-transform duration-300 ease-in-out
-          relative
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
