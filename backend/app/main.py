@@ -59,6 +59,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# CSRF runs OUTSIDE CORS (Starlette adds in reverse so the last add
+# wraps outermost). Safe methods + auth endpoints are bypassed inside
+# the middleware itself, so OPTIONS preflights still reach CORS cleanly.
+from app.core.csrf import CSRFMiddleware  # noqa: E402 — local to avoid circular import on cold start
+app.add_middleware(CSRFMiddleware)
+
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
 

@@ -57,6 +57,20 @@ class Settings(BaseSettings):
 
     # Email Dry-Run Mode (for development - logs instead of sending)
     EMAIL_DRY_RUN: bool = True
+
+    # Cookie auth (#42). The deployed frontend + backend live on different
+    # Cloud Run hostnames, so `SameSite=Lax` would prevent cookies from
+    # attaching to cross-origin XHR. Production must use `None` + `Secure`
+    # (HTTPS-only); local dev defaults to `Lax` over HTTP so logins work
+    # against http://localhost. Override AUTH_COOKIE_SAMESITE / SECURE
+    # explicitly when serving on a single domain.
+    AUTH_COOKIE_NAME_ACCESS: str = "access_token"
+    AUTH_COOKIE_NAME_REFRESH: str = "refresh_token"
+    AUTH_COOKIE_NAME_CSRF: str = "csrf_token"
+    AUTH_COOKIE_SAMESITE: str = "lax"   # "lax" | "strict" | "none"
+    AUTH_COOKIE_SECURE: bool = False    # True in prod (HTTPS only)
+    AUTH_COOKIE_DOMAIN: Optional[str] = None  # set when serving multi-subdomain on one site
+
     class Config:
         env_file = ".env"
         case_sensitive = True

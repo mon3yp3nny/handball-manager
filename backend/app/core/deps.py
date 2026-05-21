@@ -1,37 +1,57 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.db.session import get_db
+from app.core.config import settings
 from app.core.security import decode_token
 from app.models.user import User, UserRole
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+# OAuth2 scheme stays — kept as the documented Bearer mechanism for
+# API clients (E2E suite, future mobile, curl). The cookie path below
+# is preferred when both are present.
+# auto_error=False so requests without a header don't 401 here; the
+# cookie path below gets a chance first.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
 ) -> User:
+    """Resolve the caller to a User. Token sources (in order):
+
+    1. ``access_token`` httpOnly cookie — the default for browser SPAs
+       after #42 moved tokens out of localStorage.
+    2. ``Authorization: Bearer <token>`` header — kept as a fallback
+       so API clients (E2E suite, curl, future mobile apps) keep working.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
-    payload = decode_token(token)
+
+    # Cookie takes precedence — see docstring.
+    cookie_token = request.cookies.get(settings.AUTH_COOKIE_NAME_ACCESS)
+    presented = cookie_token or token
+    if not presented:
+        raise credentials_exception
+
+    payload = decode_token(presented)
     if payload is None or payload.get("type") != "access":
         raise credentials_exception
-    
+
     email: Optional[str] = payload.get("sub")
     if email is None:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.is_active:
         raise credentials_exception
-    
+
     return user
 
 

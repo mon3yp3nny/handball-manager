@@ -1,10 +1,11 @@
 """OAuth authentication endpoints."""
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.db.session import get_db
+from app.core import security
 from app.core.deps import get_current_user
 from app.core.rate_limit import limiter
 from app.services.oauth_service import (
@@ -25,8 +26,9 @@ router = APIRouter()
 @limiter.limit("10/minute")
 async def google_oauth_login(
     request: Request,
+    response: Response,
     oauth_request: OAuthLoginRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Login with Google OAuth token.
@@ -57,8 +59,10 @@ async def google_oauth_login(
 
     logger.info("Google OAuth login: user_id=%s, is_new=%s", user.id, is_new_user)
 
-    # Create tokens
+    # Create tokens + set cookies (#42).
     tokens = oauth_service.create_tokens(user)
+    csrf = security.set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
+    response.headers["X-CSRF-Token"] = csrf
 
     return OAuthCallbackResponse(
         access_token=tokens["access_token"],
@@ -78,8 +82,9 @@ async def google_oauth_login(
 @limiter.limit("10/minute")
 async def apple_oauth_login(
     request: Request,
+    response: Response,
     oauth_request: OAuthLoginRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Login with Apple OAuth token.
@@ -119,8 +124,10 @@ async def apple_oauth_login(
 
     logger.info("Apple OAuth login: user_id=%s, is_new=%s", user.id, is_new_user)
 
-    # Create tokens
+    # Create tokens + set cookies (#42).
     tokens = oauth_service.create_tokens(user)
+    csrf = security.set_auth_cookies(response, tokens["access_token"], tokens["refresh_token"])
+    response.headers["X-CSRF-Token"] = csrf
 
     return OAuthCallbackResponse(
         access_token=tokens["access_token"],

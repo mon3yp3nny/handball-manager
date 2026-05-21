@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -96,9 +96,16 @@ def register(
 @limiter.limit("30/minute")
 def login(
     request: Request,
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
+    """Authenticate and issue tokens.
+
+    Tokens are returned in the JSON body **and** set as httpOnly cookies
+    (#42). Browser SPAs rely on the cookies; the JSON keeps Bearer-based
+    API clients (E2E suite, future mobile, curl) working.
+    """
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         logger.warning("Failed login attempt for email=%s", form_data.username)
@@ -111,15 +118,17 @@ def login(
     logger.info("User logged in: user_id=%s, email=%s", user.id, user.email)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    # Include all requested roles in token (for future multi-role support)
-    # Currently only stores primary role, but API ready for multi-role
     access_token = security.create_access_token(
         data={"sub": user.email, "role": user.role.value},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
-    refresh_token = security.create_refresh_token(
-        data={"sub": user.email}
-    )
+    refresh_token = security.create_refresh_token(data={"sub": user.email})
+
+    # Attach httpOnly cookies + a non-httpOnly CSRF token. The CSRF
+    # token is returned in the JSON too so the SPA can grab it without
+    # waiting for the cookie to populate `document.cookie`.
+    csrf_token = security.set_auth_cookies(response, access_token, refresh_token)
+    response.headers["X-CSRF-Token"] = csrf_token
 
     return TokenResponse(
         access_token=access_token,
@@ -130,41 +139,78 @@ def login(
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(
-    refresh_token: str,
-    db: Session = Depends(get_db)
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    refresh_token: Optional[str] = None,
 ):
-    payload = security.decode_token(refresh_token)
+    """Issue a fresh access token. The refresh token comes from:
+
+    1. the ``refresh_token`` httpOnly cookie (default for browser SPAs), or
+    2. the JSON body field ``refresh_token`` (kept for API clients).
+    """
+    presented = request.cookies.get(settings.AUTH_COOKIE_NAME_REFRESH) or refresh_token
+    if not presented:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token missing",
+        )
+
+    payload = security.decode_token(presented)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+            detail="Invalid refresh token",
         )
 
     email = payload.get("sub")
     if email is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+            detail="Invalid refresh token",
         )
 
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
+            detail="User not found or inactive",
         )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = security.create_access_token(
+    new_access = security.create_access_token(
         data={"sub": user.email, "role": user.role.value},
-        expires_delta=access_token_expires
+        expires_delta=access_token_expires,
     )
 
+    # Roll the cookies so the access cookie matches the new access
+    # token; reuse the same refresh token (still valid).
+    csrf_token = security.set_auth_cookies(response, new_access, presented)
+    response.headers["X-CSRF-Token"] = csrf_token
+
     return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
+        access_token=new_access,
+        refresh_token=presented,
         role=user.role,
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout():
+    """Clear the auth cookies.
+
+    State-changing → CSRF middleware enforces the X-CSRF-Token header
+    (the SPA always echoes it). Prevents cross-origin forced-logout
+    annoyance; XSS on the page can still log out trivially (the CSRF
+    cookie isn't httpOnly) which is expected.
+
+    We construct a single Response and set cookies on it — earlier
+    versions injected `response: Response` then returned a fresh
+    `Response(...)`, which silently dropped the Set-Cookie headers.
+    """
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    security.clear_auth_cookies(response)
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
