@@ -1,7 +1,16 @@
 from datetime import datetime, timedelta
 from app.utils.time import utcnow
 from typing import Optional, Union
-from jose import JWTError, jwt
+
+# PyJWT (the maintained, modern JOSE-token library). python-jose was
+# removed in #85 — both libraries expose the same `jwt.encode` /
+# `jwt.decode` API for HS256, so the only swap was the exception type:
+# jose.JWTError → jwt.PyJWTError (covers ExpiredSignatureError,
+# InvalidTokenError, and friends). `oauth_service.py` was already using
+# this library; consolidating here cuts a duplicated dep + a known
+# CVE-history dependency.
+import jwt
+
 from passlib.context import CryptContext
 from app.core.config import settings
 
@@ -39,5 +48,5 @@ def decode_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
-    except JWTError:
+    except jwt.PyJWTError:
         return None
