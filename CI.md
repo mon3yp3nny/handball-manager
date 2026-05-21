@@ -129,6 +129,26 @@ Frontend tests aren't gated yet — [#55](https://github.com/mon3yp3nny/handball
 will add Vitest and we'll insert a `frontend-tests` step ahead of
 `frontend-build` with the same `waitFor: ['-']` semantics.
 
+## Sentry observability (#64)
+
+The pipeline forwards two Sentry-related values on every deploy:
+
+- Backend: `SENTRY_RELEASE=$SHORT_SHA` + `SENTRY_ENVIRONMENT=production`
+  via `--update-env-vars` (preserves the existing `SENTRY_DSN`).
+- Frontend: `VITE_GIT_SHA=$SHORT_SHA` baked into the bundle, plus
+  `VITE_SENTRY_DSN` from the `_VITE_SENTRY_DSN` substitution.
+
+To enable the frontend integration, set the DSN substitution on the
+trigger once:
+
+```bash
+gcloud builds triggers update handball-main \
+  --update-substitutions=_VITE_SENTRY_DSN=https://...@o0.ingest.sentry.io/0
+```
+
+Full Sentry setup (project creation, alerts, scrubbing details) lives
+in [OBSERVABILITY.md](./OBSERVABILITY.md).
+
 ## Watching a build
 
 - Console: [Cloud Build → History](https://console.cloud.google.com/cloud-build/builds?project=handball-club-manager)

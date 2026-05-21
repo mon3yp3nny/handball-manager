@@ -6,9 +6,17 @@ FROM node:20-alpine AS builder
 ARG VITE_API_URL="https://handball-backend-218596927281.europe-west1.run.app/api/v1"
 ARG VITE_GOOGLE_CLIENT_ID=""
 ARG VITE_APPLE_CLIENT_ID=""
+# Sentry observability (#64) — DSN empty = disabled. GIT_SHA is the
+# release tag so issues are bisectable to a specific deploy.
+ARG VITE_SENTRY_DSN=""
+ARG VITE_SENTRY_ENVIRONMENT="production"
+ARG VITE_GIT_SHA=""
 ENV VITE_API_URL=$VITE_API_URL \
     VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
-    VITE_APPLE_CLIENT_ID=$VITE_APPLE_CLIENT_ID
+    VITE_APPLE_CLIENT_ID=$VITE_APPLE_CLIENT_ID \
+    VITE_SENTRY_DSN=$VITE_SENTRY_DSN \
+    VITE_SENTRY_ENVIRONMENT=$VITE_SENTRY_ENVIRONMENT \
+    VITE_GIT_SHA=$VITE_GIT_SHA
 
 WORKDIR /app
 

@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     AUTH_COOKIE_SECURE: bool = False    # True in prod (HTTPS only)
     AUTH_COOKIE_DOMAIN: Optional[str] = None  # set when serving multi-subdomain on one site
 
+    # Sentry observability (#64). Leave SENTRY_DSN unset to disable.
+    # SENTRY_RELEASE is populated by Cloud Build with $SHORT_SHA so each
+    # deploy is tagged — bisecting "which deploy introduced this" works.
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: str = "development"
+    SENTRY_RELEASE: Optional[str] = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1  # 10% of requests get perf spans
+
     class Config:
         env_file = ".env"
         case_sensitive = True

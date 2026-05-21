@@ -335,6 +335,13 @@ test suite, builds both Docker images in parallel, and deploys to Cloud
 Run. See [`CI.md`](./CI.md) for the pipeline diagram, trigger setup, and
 rollback instructions.
 
+### Error Monitoring (Sentry)
+
+Backend + frontend both ship errors to Sentry, tagged with the deploy's
+git SHA so issues are bisectable. Credentials are scrubbed, only
+`user_id` + `role` are attached as context (no PII). See
+[`OBSERVABILITY.md`](./OBSERVABILITY.md) for setup.
+
 ## GitHub Issues & Features
 
 All features are tracked in GitHub Issues:

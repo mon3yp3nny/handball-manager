@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { initSentry } from './lib/sentry'
 import './styles/index.css'
+
+// Initialize Sentry before React mounts so the SDK is ready when the
+// first render runs. No-op when VITE_SENTRY_DSN is unset. See #64.
+initSentry()
 
 const queryClient = new QueryClient({
   defaultOptions: {

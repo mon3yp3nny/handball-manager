@@ -2,8 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
+import { setSentryUser, clearSentryUser } from '@/lib/sentry';
 import { UserLogin, User } from '@/types';
 import toast from 'react-hot-toast';
+
+/** Resolve the user's role for Sentry — multi-role users get their
+ *  primary role label; falls back to the legacy single-role field. */
+function primaryRoleFor(u: User | null | undefined): string | undefined {
+  if (!u) return undefined;
+  const roles = (u as any).roles;
+  if (Array.isArray(roles) && roles.length > 0) return String(roles[0]);
+  if ((u as any).role) return String((u as any).role);
+  return undefined;
+}
 
 /**
  * Auth flow uses cookies (#42). After login the backend sets httpOnly
@@ -27,6 +38,10 @@ export const useAuth = () => {
       // store API still expects the field. (#42 follow-up could trim
       // it from the store type.)
       setAuth(me, '');
+      // Tag the Sentry scope with user_id + role so any subsequent
+      // error in this session is correlated to a known user. id + role
+      // only — never email or name. See #64.
+      setSentryUser(me.id, primaryRoleFor(me));
       return { user: me };
     },
     onSuccess: () => {
@@ -50,6 +65,7 @@ export const useAuth = () => {
     void api.logout();
     storeLogout();
     queryClient.clear();
+    clearSentryUser();
     toast.success('Abgemeldet');
   };
 
@@ -64,10 +80,14 @@ export const useAuth = () => {
     retry: false,
     onSuccess: (fresh: User) => {
       useAuthStore.setState({ user: fresh, isAuthenticated: true, token: '' });
+      // Page-reload path: cookie was valid → re-attach user to Sentry
+      // scope so post-reload errors are still tagged. (#64)
+      setSentryUser(fresh.id, primaryRoleFor(fresh));
     },
     onError: () => {
       // Cookie missing/expired — clear any stale persisted user.
       useAuthStore.setState({ user: null, isAuthenticated: false, token: null });
+      clearSentryUser();
     },
   });
 

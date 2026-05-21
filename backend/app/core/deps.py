@@ -52,6 +52,13 @@ def get_current_user(
     if user is None or not user.is_active:
         raise credentials_exception
 
+    # Attach user_id + role to the Sentry scope so any downstream
+    # exception captured during this request carries identity. No-op
+    # when Sentry isn't initialized. PII-minimal: id + role only,
+    # never email/name/IP. See #64.
+    from app.core.observability import set_user_context
+    set_user_context(user.id, role=user.role.value if user.role else None)
+
     return user
 
 

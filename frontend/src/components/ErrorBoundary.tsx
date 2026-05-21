@@ -1,4 +1,5 @@
 import React from 'react';
+import { captureError } from '@/lib/sentry';
 
 interface Props {
   children: React.ReactNode;
@@ -28,12 +29,18 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // Surface to console + future hook for Sentry/etc. (see issue #64).
+    // Always log to console so dev sees the stack trace locally even
+    // without a Sentry DSN configured.
     console.error(
       `[ErrorBoundary${this.props.name ? `:${this.props.name}` : ''}]`,
       error,
       info,
     );
+    // Ship to Sentry. No-op when Sentry isn't initialized (#64).
+    captureError(error, {
+      boundary: this.props.name ?? 'root',
+      componentStack: info.componentStack,
+    });
   }
 
   componentDidUpdate(prevProps: Props) {

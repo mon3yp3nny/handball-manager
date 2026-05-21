@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.logging_config import setup_logging
+from app.core.observability import init_sentry
 from app.core.rate_limit import limiter
 from app.api.v1.api import api_router
 from app.db.session import engine, Base, SessionLocal
@@ -20,6 +21,10 @@ from app.core.security import decode_token
 
 # Configure structured logging before anything else
 setup_logging()
+
+# Initialize Sentry BEFORE FastAPI() so the integration can wrap the
+# ASGI app. No-op when SENTRY_DSN is unset (dev + tests). See #64.
+init_sentry()
 
 logger = logging.getLogger(__name__)
 
