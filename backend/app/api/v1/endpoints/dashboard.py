@@ -175,7 +175,16 @@ def get_dashboard_widgets(
             }
 
     # --- upcoming birthdays (next 7 days) ---
-    players_q = db.query(Player).filter(Player.date_of_birth.isnot(None))
+    # Pre-load the linked user so the birthday-emit loop below can
+    # read p.user.first_name / .last_name without firing one SELECT
+    # per matched player (#62). selectinload batches the user fetch
+    # into a single IN(...) query.
+    from sqlalchemy.orm import selectinload
+    players_q = (
+        db.query(Player)
+        .filter(Player.date_of_birth.isnot(None))
+        .options(selectinload(Player.user))
+    )
     if visible_team_ids is not None:
         if not visible_team_ids:
             players = []

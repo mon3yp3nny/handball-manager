@@ -30,7 +30,18 @@ def get_players(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = db.query(Player).join(User, Player.user_id == User.id)
+    from sqlalchemy.orm import selectinload
+
+    # PlayerResponse embeds `user: Optional[UserBase]`. Without eager
+    # loading, FastAPI triggers a SELECT-on-users per row when it
+    # serializes (#62 — classic N+1; 16 queries for 13 players in the
+    # audit). selectinload issues ONE extra IN(...) query for the whole
+    # batch instead of one-per-row.
+    query = (
+        db.query(Player)
+        .join(User, Player.user_id == User.id)
+        .options(selectinload(Player.user))
+    )
 
     # Team visibility via the central helper. Parents have one extra
     # wrinkle: their child might have NO team yet (team_id IS NULL),
