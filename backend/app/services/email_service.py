@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from fastapi_mail.errors import ConnectionErrors
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 
 from app.core.config import settings
 
@@ -14,10 +14,19 @@ logger = logging.getLogger(__name__)
 
 class EmailService:
     """Service for sending emails via SMTP with HTML templates."""
-    
+
     def __init__(self):
         self._fm: Optional[FastMail] = None
         self._templates_dir = Path(__file__).parent.parent / "templates" / "email"
+        # Real Jinja Environment with a FileSystemLoader — without this the
+        # `{% extends "base.html" %}` in the HTML templates raises
+        # "no loader for this environment specified" and every HTML email
+        # silently fails (the BackgroundTasks swallow the traceback).
+        self._jinja = Environment(
+            loader=FileSystemLoader(self._templates_dir),
+            autoescape=select_autoescape(["html"]),  # text templates stay raw
+            keep_trailing_newline=True,
+        )
     
     def _get_fastmail(self) -> Optional[FastMail]:
         """Initialize FastMail connection if SMTP is configured."""
@@ -44,18 +53,18 @@ class EmailService:
         return self._fm
     
     def _render_template(self, template_name: str, context: dict, text_fallback: bool = False) -> str:
-        """Render a Jinja2 template."""
+        """Render a Jinja2 template through the FileSystemLoader so the
+        HTML variants can `{% extends "base.html" %}` cleanly. Falls back
+        to the .txt variant if the requested file is missing.
+        """
         ext = ".txt" if text_fallback else ".html"
-        template_path = self._templates_dir / f"{template_name}{ext}"
-        
-        if not template_path.exists():
-            # Fallback to text if HTML not found
+        name = f"{template_name}{ext}"
+        try:
+            template = self._jinja.get_template(name)
+        except TemplateNotFound:
             if not text_fallback:
                 return self._render_template(template_name, context, text_fallback=True)
             return f"Error: Template {template_name} not found"
-        
-        template_content = template_path.read_text(encoding='utf-8')
-        template = Template(template_content)
         return template.render(**context)
     
     def _log_email(self, to_email: str, subject: str, body: str, body_html: Optional[str] = None):
@@ -92,21 +101,28 @@ class EmailService:
             return True
         
         try:
-            message = MessageSchema(
-                subject=subject,
-                recipients=[to_email],
-                body=body_text,
-                subtype="plain",
-            )
-            
+            # fastapi-mail 1.4 MessageSchema has no `alternatives` attribute;
+            # trying to set it raises and tanks every HTML send. Send the
+            # HTML version when present (mail clients downgrade to a
+            # text/plain rendering automatically); fall back to text
+            # otherwise.
             if body_html:
-                message.body = body_html
-                message.subtype = "html"
-                # Also attach plain text as alternative
-                message.alternatives = [(body_text, "text/plain")]
-            
+                message = MessageSchema(
+                    subject=subject,
+                    recipients=[to_email],
+                    body=body_html,
+                    subtype="html",
+                )
+            else:
+                message = MessageSchema(
+                    subject=subject,
+                    recipients=[to_email],
+                    body=body_text,
+                    subtype="plain",
+                )
+
             await fm.send_message(message)
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info("Email sent successfully to %s", to_email)
             return True
             
         except ConnectionErrors as e:
@@ -168,9 +184,44 @@ class EmailService:
         subject = "Willkommen beim Handball Manager!"
         body_text = self._render_template("welcome", context, text_fallback=True)
         body_html = self._render_template("welcome", context)
-        
+
         return await self._send_email(to_email, subject, body_text, body_html)
-    
+
+    async def send_password_reset_email(
+        self,
+        to_email: str,
+        first_name: str,
+        reset_link: str,
+        expires_in: str = "1 Stunde",
+    ) -> bool:
+        """Send a password-reset link. Closes the long-standing TODO at
+        api/v1/endpoints/auth.py:222.
+        """
+        context = {
+            "first_name": first_name,
+            "reset_link": reset_link,
+            "expires_in": expires_in,
+        }
+        subject = "Passwort zurücksetzen — Handball Manager"
+        body_text = self._render_template("password_reset", context, text_fallback=True)
+        body_html = self._render_template("password_reset", context)
+        return await self._send_email(to_email, subject, body_text, body_html)
+
+    async def send_test_email(self, to_email: str) -> bool:
+        """Send a no-template "ping" so operators can verify SMTP wiring
+        from the admin UI / curl without dragging real flows in.
+        """
+        subject = "Handball Manager — SMTP-Test"
+        body_text = (
+            "Dies ist eine Test-E-Mail vom Handball Manager Backend.\n\n"
+            "Wenn du diese E-Mail erhältst, sind die SMTP-Einstellungen korrekt konfiguriert.\n"
+        )
+        body_html = (
+            "<p>Dies ist eine <strong>Test-E-Mail</strong> vom Handball Manager Backend.</p>"
+            "<p>Wenn du diese E-Mail erhältst, sind die SMTP-Einstellungen korrekt konfiguriert.</p>"
+        )
+        return await self._send_email(to_email, subject, body_text, body_html)
+
     async def send_parent_credentials_email(
         self,
         to_email: str,

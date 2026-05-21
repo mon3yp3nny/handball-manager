@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -7,9 +7,10 @@ from typing import Optional
 
 from app.core import security
 from app.core.config import settings
-from app.core.deps import get_db, get_current_user
+from app.core.deps import get_db, get_current_user, require_admin
 from app.core.rate_limit import limiter
 from app.models.user import User, UserRole
+from app.services.email_service import email_service
 from app.models.player import Player
 from app.schemas.user import TokenResponse, LoginRequest, UserResponse, UserCreate
 
@@ -36,7 +37,8 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
 def register(
     request: Request,
     user_data: UserCreate,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
     """Register a new user (public endpoint)."""
     # Check if email exists
@@ -77,6 +79,14 @@ def register(
 
     logger.info("New user registered: user_id=%s, email=%s, role=%s",
                 db_user.id, db_user.email, db_user.role.value)
+
+    # Welcome email — best-effort via BackgroundTasks (failures are
+    # logged inside the service; we don't fail the registration).
+    background_tasks.add_task(
+        email_service.send_welcome_email,
+        to_email=db_user.email,
+        first_name=db_user.first_name,
+    )
 
     return db_user
 
@@ -198,28 +208,65 @@ def change_password(
 def forgot_password(
     request: Request,
     data: dict,
-    db: Session = Depends(get_db)
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
 ):
-    """Request password reset"""
+    """Request password reset — generates a token and emails a link."""
     email = data.get("email")
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email is required"
+            detail="Email is required",
         )
-    
+
     user = db.query(User).filter(User.email == email).first()
+    # Always return the same shape so callers can't enumerate registered
+    # emails. The actual send only fires when the user exists.
+    generic = {"message": "If the email exists, a reset link will be sent"}
     if not user:
-        # Don't reveal if email exists
-        return {"message": "If the email exists, a reset link will be sent"}
-    
-    # Generate reset token
+        return generic
+
     reset_token = security.create_access_token(
         data={"sub": user.email, "type": "password_reset"},
-        expires_delta=timedelta(hours=1)
+        expires_delta=timedelta(hours=1),
     )
-    
-    # TODO: Send email with reset token
-    logger.info("Password reset requested for %s", email)
-    
-    return {"message": "If the email exists, a reset link will be sent"}
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+
+    logger.info("Password reset requested for user_id=%s", user.id)
+    # Send via BackgroundTasks so an SMTP hiccup doesn't surface as a
+    # request error and leak that the email exists.
+    background_tasks.add_task(
+        email_service.send_password_reset_email,
+        to_email=user.email,
+        first_name=user.first_name,
+        reset_link=reset_link,
+    )
+
+    return generic
+
+
+@router.post("/email/test", status_code=status.HTTP_202_ACCEPTED)
+def send_test_email(
+    request: Request,
+    data: dict,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(require_admin),
+):
+    """Admin-only: send a no-template test email to verify SMTP wiring.
+
+    Body: ``{"to": "ops@example.com"}``. Returns 202 immediately and
+    sends in the background — check the configured inbox + the Cloud
+    Run logs to see the result.
+    """
+    to = (data or {}).get("to")
+    if not to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="'to' field is required",
+        )
+    background_tasks.add_task(email_service.send_test_email, to_email=to)
+    return {
+        "message": f"Test email queued for {to}",
+        "dry_run": bool(settings.EMAIL_DRY_RUN or not settings.SMTP_HOST),
+        "smtp_host": settings.SMTP_HOST,
+    }
