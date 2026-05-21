@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from app.core.deps import get_db, get_current_user, require_coach, require_admin
 from app.core.security import get_password_hash
+from app.utils.time import utcnow
 from app.models.user import User, UserRole
 from app.models.player import Player
 from app.models.team import Team
@@ -318,30 +319,35 @@ def get_my_schedule(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get logged-in player's team schedule (games and training)"""
+    """Get logged-in player's team schedule (games and training)."""
     from app.models.game import Game
     from app.models.event import Event
-    from datetime import datetime
 
-    if current_user.role != UserRole.PLAYER:
+    # Use has_role so multi-role users (e.g. coach+player) work too —
+    # the singular `role` column only matches one of their roles.
+    if not current_user.has_role(UserRole.PLAYER):
         raise HTTPException(status_code=403, detail="Only players can access this endpoint")
 
     player = db.query(Player).filter(Player.user_id == current_user.id).first()
     if not player or not player.team_id:
         raise HTTPException(status_code=404, detail="Player or team not found")
 
-    # Get upcoming games
     now = utcnow()
-    games = db.query(Game).filter(
-        Game.team_id == player.team_id,
-        Game.game_time >= now
-    ).order_by(Game.game_time).all()
-
-    # Get upcoming training/events
-    events = db.query(Event).filter(
-        Event.team_id == player.team_id,
-        Event.start_time >= now
-    ).order_by(Event.start_time).all()
+    # The Game model stores the kick-off in `scheduled_at` (not
+    # `game_time`); calling the wrong attribute used to 500 here.
+    games = (
+        db.query(Game)
+        .filter(Game.team_id == player.team_id, Game.scheduled_at >= now)
+        .order_by(Game.scheduled_at)
+        .limit(5)
+        .all()
+    )
+    events = (
+        db.query(Event)
+        .filter(Event.team_id == player.team_id, Event.start_time >= now)
+        .order_by(Event.start_time)
+        .all()
+    )
 
     return {
         "team_id": player.team_id,
@@ -350,11 +356,12 @@ def get_my_schedule(
             {
                 "id": g.id,
                 "opponent": g.opponent,
-                "game_time": g.game_time,
+                # Match the field name used elsewhere in the API.
+                "scheduled_at": g.scheduled_at,
                 "location": g.location,
-                "is_home": g.is_home
+                "is_home_game": g.is_home_game,
             }
-            for g in games[:5]  # Limit to 5
+            for g in games
         ],
         "upcoming_training": [
             {
@@ -363,10 +370,11 @@ def get_my_schedule(
                 "event_type": e.event_type,
                 "start_time": e.start_time,
                 "end_time": e.end_time,
-                "location": e.location
+                "location": e.location,
             }
-            for e in events if e.event_type == "training"
-        ][:10],  # Limit to 10
+            for e in events
+            if e.event_type.value == "training"
+        ][:10],
     }
 
 

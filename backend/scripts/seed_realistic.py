@@ -559,9 +559,24 @@ def seed(client: HMClient) -> None:
     thomas = client.create_user(
         "thomas.weber@tvfischbek.de", "Thomas", "Weber", "coach"
     )
-    # E2E demo coach (login: coach@handball.de / coach123)
+    # E2E demo coach (login: coach@handball.de / coach123). Assigned as
+    # the U17 head coach below so logging in lands in a populated
+    # workspace AND eltern's linked child Finn is under this coach —
+    # makes the parent → coach demo flow coherent.
     coach_demo = client.create_user(
         "coach@handball.de", "Coach", "Demo", "coach", password="coach123"
+    )
+
+    # --- supervisor -----------------------------------------------
+    # The role exists in the codebase but had no seeded account, so the
+    # "Betreuer" demo flow couldn't be tried. Adding a canonical login
+    # alongside the other demo creds.
+    client.create_user(
+        "supervisor@handball.de",
+        "Sabine",
+        "Schubert",
+        "supervisor",
+        password="super123",
     )
 
     # --- teams -----------------------------------------------------
@@ -573,9 +588,12 @@ def seed(client: HMClient) -> None:
         "TVF Damen 1", "Damen", anna,
         description="Erste Frauenmannschaft.",
     )
+    # U17 is head-coached by the demo coach so the canonical
+    # coach@handball.de login lands on Finn's team. Thomas remains as
+    # a coach user (assistant — no team_id) until we model multi-coach.
     u17m = client.create_team(
-        "TVF U17 männlich", "U17 m", thomas,
-        description="Männliche A-Jugend.",
+        "TVF U17 männlich", "U17 m", coach_demo,
+        description="Männliche A-Jugend. Trainer: Coach Demo, Assistent: Thomas Weber.",
     )
     print(f"   teams created: {[maenner1, damen1, u17m]}")
 
