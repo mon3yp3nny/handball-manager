@@ -32,7 +32,9 @@ class PlayerAvailability(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
+    player_id = Column(
+        Integer, ForeignKey("players.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
     from_date = Column(Date, nullable=False)
     # NULL = open-ended, e.g. "out until further notice".
     to_date = Column(Date, nullable=True)
@@ -41,7 +43,9 @@ class PlayerAvailability(Base):
     # Medical entries are hidden from non-medical roles per #12; the flag
     # lives next to the row so the API filter is a single column check.
     is_medical = Column(Boolean, default=False, nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    created_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

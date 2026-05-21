@@ -24,12 +24,23 @@ class Attendance(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer, ForeignKey("players.id"), nullable=False, index=True)
-    game_id = Column(Integer, ForeignKey("games.id"), nullable=True, index=True)
-    event_id = Column(Integer, ForeignKey("events.id"), nullable=True, index=True)
+    # ON DELETE rules: when the parent Player / Game / Event goes (via
+    # team-delete cascade or hard delete), the attendance row goes with
+    # it. recorded_by is informational — keep the row, drop the link.
+    player_id = Column(
+        Integer, ForeignKey("players.id", ondelete="CASCADE"), nullable=False, index=True,
+    )
+    game_id = Column(
+        Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
+    event_id = Column(
+        Integer, ForeignKey("events.id", ondelete="CASCADE"), nullable=True, index=True,
+    )
     status = Column(Enum(AttendanceStatus), default=AttendanceStatus.PENDING)
     notes = Column(String, nullable=True)
-    recorded_by = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    recorded_by = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
+    )
     recorded_at = Column(DateTime, default=utcnow)
     
     # Relationships
