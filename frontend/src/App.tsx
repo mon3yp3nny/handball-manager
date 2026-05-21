@@ -5,6 +5,7 @@ import { api } from '@/services/api';
 
 // Layout
 import { AppLayout } from '@/components/layout/AppLayout';
+import { RouteBoundary } from '@/components/RouteBoundary';
 
 // Pages
 import { LoginPage } from '@/pages/auth/LoginPage';
@@ -69,9 +70,34 @@ function App() {
 
   return (
     <Routes>
-      {/* Public routes */}
-      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/register" element={isAuthenticated ? <Navigate to="/" replace /> : <RegisterPage />} />
+      {/* Public routes — wrapped in their own RouteBoundary because they
+          bypass AppLayout (which already has its own boundary around
+          the protected-route Outlet). A crash in LoginPage shouldn't
+          take down the whole app and prevent the user from retrying. */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <RouteBoundary name="login" inline={false}>
+              <LoginPage />
+            </RouteBoundary>
+          )
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <RouteBoundary name="register" inline={false}>
+              <RegisterPage />
+            </RouteBoundary>
+          )
+        }
+      />
 
       {/* Protected routes */}
       <Route path="/" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
