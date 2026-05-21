@@ -55,9 +55,25 @@ steps:
     args: ['push', '--all-tags', '${_BACKEND_IMAGE}']
     waitFor: ['backend-build']
 
-  # ─── frontend image (parallel with backend after tests) ────────
-  # No tests here yet (#55 will add Vitest). The vite build is the
-  # implicit type-check + bundle gate.
+  # ─── frontend test gate (#55) ────────────────────────────────
+  # Vitest runs against happy-dom — 30s including npm ci. Parallel
+  # with backend-tests (no shared state). A red gate here blocks the
+  # frontend-build step.
+  - id: frontend-tests
+    name: node:22-slim
+    dir: frontend
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        npm ci --no-audit --no-fund --prefer-offline
+        npx vitest run --reporter=default
+    waitFor: ['-']
+
+  # ─── frontend image ───────────────────────────────────────────
+  # Vite build is the implicit type-check + bundle gate. Gated on
+  # frontend-tests so we don't waste a build on a red unit suite.
   #
   # Sentry (#64): VITE_SENTRY_DSN + VITE_GIT_SHA are baked in here so
   # the deployed bundle ships errors with a release tag. DSN lives as
@@ -83,7 +99,7 @@ steps:
       - -t
       - ${_FRONTEND_IMAGE}:latest
       - .
-    waitFor: ['backend-tests']  # don't waste a build on a failing test gate
+    waitFor: ['backend-tests', 'frontend-tests']  # both gates must be green
 
   - id: frontend-push
     name: gcr.io/cloud-builders/docker

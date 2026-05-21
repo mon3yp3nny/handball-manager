@@ -11,22 +11,22 @@ deploys to Cloud Run on every push to `main`.
 ## Pipeline at a glance
 
 ```
-            ┌─────────────────┐
-            │ backend-tests   │   (pytest gate — must pass)
-            └────────┬────────┘
-        ┌────────────┴────────────┐
-        ▼                         ▼
-┌──────────────┐          ┌──────────────┐
-│ backend-build│          │ frontend-build│   (parallel)
-└──────┬───────┘          └──────┬───────┘
-       ▼                         ▼
-┌──────────────┐          ┌──────────────┐
-│ backend-push │          │ frontend-push│
-└──────┬───────┘          └──────┬───────┘
-       ▼                         ▼
-┌──────────────┐          ┌──────────────┐
-│deploy-backend│          │deploy-frontend│
-└──────────────┘          └──────────────┘
+   ┌─────────────────┐      ┌─────────────────┐
+   │ backend-tests   │      │ frontend-tests  │   (parallel test gates)
+   │   (pytest)      │      │   (vitest)      │
+   └────────┬────────┘      └────────┬────────┘
+            ▼                        ▼
+   ┌──────────────┐         ┌──────────────┐
+   │backend-build │         │frontend-build│
+   └──────┬───────┘         └──────┬───────┘
+          ▼                        ▼
+   ┌──────────────┐         ┌──────────────┐
+   │backend-push  │         │ frontend-push│
+   └──────┬───────┘         └──────┬───────┘
+          ▼                        ▼
+   ┌──────────────┐         ┌──────────────┐
+   │deploy-backend│         │deploy-frontend│
+   └──────────────┘         └──────────────┘
 ```
 
 Each image gets two tags:
@@ -119,15 +119,18 @@ gcloud run deploy handball-frontend \
 The old `deploy.sh` script still works for ad-hoc local deploys but is no
 longer the primary path — CI is.
 
-## What runs in the test gate
+## What runs in the test gates
 
-`backend-tests` runs `pytest --no-cov -q` against the in-memory SQLite
-fixture in `conftest.py`. No DB sidecar, no fixtures plumbing, no
-secrets. Currently ~243 tests, ~30 seconds.
+**`backend-tests`** runs `pytest --no-cov -q` against the in-memory
+SQLite fixture in `conftest.py`. No DB sidecar, no fixtures plumbing,
+no secrets. Currently ~262 tests, ~30 seconds.
 
-Frontend tests aren't gated yet — [#55](https://github.com/mon3yp3nny/handball-manager/issues/55)
-will add Vitest and we'll insert a `frontend-tests` step ahead of
-`frontend-build` with the same `waitFor: ['-']` semantics.
+**`frontend-tests`** runs `vitest run` against happy-dom inside a
+`node:22-slim` container. ~30s including `npm ci`. See
+[`frontend/TESTING.md`](./frontend/TESTING.md) for layout and conventions.
+
+Both gate the build — a red unit suite blocks `*-build` and nothing
+deploys.
 
 ## Sentry observability (#64)
 

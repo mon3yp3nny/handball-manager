@@ -298,10 +298,19 @@ cd backend
 pytest
 ```
 
-Frontend:
+Frontend (unit + component tests via Vitest + happy-dom):
 ```bash
 cd frontend
-npm run test
+npm test            # one-shot (CI mode)
+npm run test:watch  # interactive
+```
+See [`frontend/TESTING.md`](./frontend/TESTING.md) for conventions.
+Requires Node 22 LTS (`.nvmrc` pins it — Vitest hangs on Node 25).
+
+Frontend (end-to-end via Playwright):
+```bash
+cd frontend
+npx playwright test
 ```
 
 ### Database Migrations (using Alembic)
