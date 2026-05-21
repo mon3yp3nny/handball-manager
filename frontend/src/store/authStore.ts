@@ -102,27 +102,33 @@ export const useAuthStore = create<AuthState>(
       setToken: (token) => set({ token, isAuthenticated: !!token }),
       setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
       logout: () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        // The httpOnly auth cookie is cleared server-side by
+        // useAuth().logout calling /auth/logout (#42). Local cleanup
+        // just resets the in-memory store.
         set({ user: null, token: null, isAuthenticated: false });
       },
-      // Dev auto-login
+      // Dev auto-login — local-only fixture for the DevRoleSwitcher.
+      // Token stays in memory; it's a dummy used by the mock API path,
+      // never a real credential.
       devAutoLogin: (role) => {
         if (!isDev || !demoUsers) return;
         const user = demoUsers[role];
-        localStorage.setItem('token', 'dev-token');
         set({ user, token: 'dev-token', isAuthenticated: true, isDevMode: true });
       },
-      // Dev role switch
       devSwitchRole: (role) => {
         if (!isDev || !demoUsers) return;
         const user = demoUsers[role];
-        localStorage.setItem('token', 'dev-token');
         set({ user, token: 'dev-token', isAuthenticated: true });
       },
     }),
     {
       name: 'auth-storage',
+      // #42: never persist the token. It's no longer a credential — the
+      // actual credential is the httpOnly auth cookie set by the server.
+      // Persisting only the `user` blob (display name, role, etc.) lets
+      // ProtectedRoute render optimistically on reload without keeping
+      // anything credential-shaped in localStorage.
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
       merge: (persisted, current) => ({
         ...current,
         ...(persisted as Partial<AuthState>),

@@ -8,9 +8,21 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 // Mock API fallback is only used in development when no backend URL is set
 let useMockApi = !import.meta.env.VITE_API_URL && import.meta.env.DEV;
 
+// Read a cookie by name; used to pull the csrf_token (NOT httpOnly,
+// readable from JS by design — see backend/app/core/csrf.py). Returns
+// null when the cookie isn't set yet (pre-login).
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const m = document.cookie.match(
+    new RegExp('(?:^|; )' + name.replace(/[-.+*]/g, '\\$&') + '=([^;]*)'),
+  );
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
 class ApiService {
   private client: AxiosInstance;
-  private token: string | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -19,50 +31,55 @@ class ApiService {
         'Content-Type': 'application/json',
       },
       timeout: 5000, // 5 second timeout
+      // #42: auth tokens live in httpOnly cookies set by the backend on
+      // login. `withCredentials: true` tells the browser to attach
+      // those cookies to every cross-origin XHR (the deployed SPA and
+      // API live on different Cloud Run subdomains).
+      withCredentials: true,
     });
 
-    // Request interceptor
+    // Request interceptor — attach the CSRF token (double-submit) on
+    // state-changing requests. The backend middleware checks that the
+    // X-CSRF-Token header equals the csrf_token cookie.
     this.client.interceptors.request.use(
       (config) => {
-        this.token = localStorage.getItem('token');
-        if (this.token) {
-          config.headers.Authorization = `Bearer ${this.token}`;
+        const method = (config.method || 'get').toUpperCase();
+        if (!SAFE_METHODS.has(method)) {
+          const csrf = readCookie('csrf_token');
+          if (csrf) {
+            config.headers['X-CSRF-Token'] = csrf;
+          }
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => Promise.reject(error),
     );
 
-    // Response interceptor
+    // Response interceptor — on 401, try a one-shot refresh. The
+    // refresh cookie travels automatically thanks to withCredentials,
+    // so we never had to read or write tokens from JS.
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as typeof error.config & { _retry?: boolean };
-
-        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+        if (
+          error.response?.status === 401 &&
+          originalRequest &&
+          !originalRequest._retry &&
+          !originalRequest.url?.includes('/auth/login') &&
+          !originalRequest.url?.includes('/auth/refresh')
+        ) {
           originalRequest._retry = true;
-          // Try to refresh token
-          const refreshToken = localStorage.getItem('refreshToken');
-          if (refreshToken) {
-            try {
-              const response = await this.refreshToken(refreshToken);
-              localStorage.setItem('token', response.access_token);
-              localStorage.setItem('refreshToken', response.refresh_token);
-              
-              // Retry original request
-              originalRequest.headers.Authorization = `Bearer ${response.access_token}`;
-              return this.client(originalRequest);
-            } catch {
-              // Refresh failed, clear tokens and redirect
-              localStorage.removeItem('token');
-              localStorage.removeItem('refreshToken');
-              window.location.href = '/login';
-            }
+          try {
+            await this.client.post('/auth/refresh');
+            return this.client(originalRequest);
+          } catch {
+            // Refresh failed — surface the original 401 and let the
+            // route guard send the user to /login.
           }
         }
-        
         return Promise.reject(error);
-      }
+      },
     );
   }
 
@@ -140,6 +157,18 @@ class ApiService {
       refresh_token: refreshToken,
     });
     return response.data;
+  }
+
+  /** Server-side logout. Clears the httpOnly auth cookies (#42).
+   * The frontend `useAuth.logout` should also wipe local state + the
+   * React Query cache. */
+  async logout(): Promise<void> {
+    try {
+      await this.client.post('/auth/logout');
+    } catch {
+      // Network/CSRF failures shouldn't block a client-side logout —
+      // the user can still drop their local state and be redirected.
+    }
   }
 
   async getMe(): Promise<User> {

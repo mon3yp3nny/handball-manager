@@ -50,11 +50,9 @@ export const LoginPage = () => {
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     setIsOAuthLoading(true);
     try {
+      // OAuth login (#42): backend sets the httpOnly auth cookies on
+      // the response — no tokens kept in JS.
       const result = await api.oauthLogin('google', credentialResponse.credential ?? '');
-
-      // Store tokens
-      localStorage.setItem('token', result.access_token);
-      localStorage.setItem('refreshToken', result.refresh_token);
 
       if (result.needs_role_selection) {
         // Show role selection modal
@@ -108,10 +106,8 @@ export const LoginPage = () => {
       const firstName = response.user?.name?.firstName;
       const lastName = response.user?.name?.lastName;
 
+      // Apple OAuth: backend sets the httpOnly auth cookies (#42).
       const result = await api.oauthLogin('apple', idToken, firstName, lastName);
-
-      localStorage.setItem('token', result.access_token);
-      localStorage.setItem('refreshToken', result.refresh_token);
 
       if (result.needs_role_selection) {
         setNewUserEmail(result.email);
