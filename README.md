@@ -328,6 +328,13 @@ alembic downgrade -1
 docker-compose -f docker-compose.prod.yml up --build -d
 ```
 
+### Continuous Deployment (Cloud Build)
+
+Every push to `main` triggers a Cloud Build pipeline that runs the backend
+test suite, builds both Docker images in parallel, and deploys to Cloud
+Run. See [`CI.md`](./CI.md) for the pipeline diagram, trigger setup, and
+rollback instructions.
+
 ## GitHub Issues & Features
 
 All features are tracked in GitHub Issues:

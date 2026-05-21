@@ -1,0 +1,148 @@
+# Cloud Build pipeline for Handball Manager (#57).
+#
+# Fires on every push to `main` once the trigger is connected:
+#   gcloud builds triggers create github \
+#     --name=handball-main \
+#     --repo-name=handball-manager --repo-owner=mon3yp3nny \
+#     --branch-pattern=^main$ \
+#     --build-config=cloudbuild.yaml \
+#     --project=handball-club-manager
+#
+# Also runnable on demand:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --project=handball-club-manager
+#
+# Flow:
+#   1. backend pytest gate (fails the build → no deploy)
+#   2. backend + frontend Docker builds run in parallel
+#   3. images tagged BOTH with $SHORT_SHA (immutable, for rollback) AND
+#      :latest (so manual deploys with --image .../latest still work)
+#   4. backend deploys first; frontend follows once backend's healthy.
+
+steps:
+
+  # ─── backend test gate ──────────────────────────────────────────
+  # python:3.11-slim matches the runtime image's base. Tests use the
+  # in-memory SQLite fixture in conftest, so no DB sidecar needed.
+  - id: backend-tests
+    name: python:3.11-slim
+    dir: backend
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        apt-get update -qq && apt-get install -y -qq gcc libpq-dev > /dev/null
+        pip install --quiet -r requirements.txt
+        python -m pytest --no-cov -q --tb=line
+    waitFor: ['-']  # start immediately
+
+  # ─── backend image ──────────────────────────────────────────────
+  - id: backend-build
+    name: gcr.io/cloud-builders/docker
+    dir: backend
+    args:
+      - build
+      - -t
+      - ${_BACKEND_IMAGE}:$SHORT_SHA
+      - -t
+      - ${_BACKEND_IMAGE}:latest
+      - .
+    waitFor: ['backend-tests']
+
+  - id: backend-push
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '--all-tags', '${_BACKEND_IMAGE}']
+    waitFor: ['backend-build']
+
+  # ─── frontend image (parallel with backend after tests) ────────
+  # No tests here yet (#55 will add Vitest). The vite build is the
+  # implicit type-check + bundle gate.
+  - id: frontend-build
+    name: gcr.io/cloud-builders/docker
+    dir: frontend
+    args:
+      - build
+      - --build-arg
+      - VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app/api/v1
+      - -t
+      - ${_FRONTEND_IMAGE}:$SHORT_SHA
+      - -t
+      - ${_FRONTEND_IMAGE}:latest
+      - .
+    waitFor: ['backend-tests']  # don't waste a build on a failing test gate
+
+  - id: frontend-push
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '--all-tags', '${_FRONTEND_IMAGE}']
+    waitFor: ['frontend-build']
+
+  # ─── deploys ────────────────────────────────────────────────────
+  # Deploy by SHA so rollback is "redeploy this commit". The env vars
+  # already configured on the service (DATABASE_URL, SECRET_KEY,
+  # SMTP_*, AUTH_COOKIE_*) persist across revisions — no need to pass
+  # them here.
+  - id: deploy-backend
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - deploy
+      - handball-backend
+      - --image
+      - ${_BACKEND_IMAGE}:$SHORT_SHA
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --add-cloudsql-instances
+      - $PROJECT_ID:${_REGION}:handball-db
+      - --max-instances
+      - '5'
+      - --memory
+      - 512Mi
+      - --cpu
+      - '1'
+    waitFor: ['backend-push']
+
+  - id: deploy-frontend
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - deploy
+      - handball-frontend
+      - --image
+      - ${_FRONTEND_IMAGE}:$SHORT_SHA
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --max-instances
+      - '5'
+      - --memory
+      - 256Mi
+      - --cpu
+      - '1'
+    waitFor: ['frontend-push']
+
+# Surface the immutable SHA-tagged images in the build summary so
+# rollback is a one-liner: `gcloud run deploy ... --image .../<old-sha>`.
+images:
+  - ${_BACKEND_IMAGE}:$SHORT_SHA
+  - ${_BACKEND_IMAGE}:latest
+  - ${_FRONTEND_IMAGE}:$SHORT_SHA
+  - ${_FRONTEND_IMAGE}:latest
+
+substitutions:
+  _BACKEND_IMAGE: gcr.io/handball-club-manager/handball-backend
+  _FRONTEND_IMAGE: gcr.io/handball-club-manager/handball-frontend
+  _REGION: europe-west1
+
+options:
+  # Bigger machine = faster build (Docker + pytest run hot). E2_HIGHCPU_8
+  # is ~3× faster than the default and the build minutes are cheap.
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
