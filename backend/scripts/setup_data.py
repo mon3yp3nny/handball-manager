@@ -180,6 +180,13 @@ def create_sample_users_with_roles(db, teams):
     for user_data in users_data:
         existing = db.query(User).filter(User.email == user_data['email']).first()
         if existing:
+            # Re-seed credentials so the script is idempotent for an
+            # already-populated dev DB. Without this, a user created by an
+            # earlier (possibly partial) run keeps a stale password and the
+            # documented Test123! login 401s. See the prod login incident.
+            existing.hashed_password = security.get_password_hash(user_data['password'])
+            existing.is_active = True
+            existing.is_verified = True
             # Update roles if user exists
             if existing.roles_data:
                 roles = json.loads(existing.roles_data)
@@ -332,7 +339,7 @@ def create_sample_events(db, teams):
             title=event_data['title'],
             team_id=team_id,
             event_type=event_data['type'],
-            visibility=EventVisibility.TEAM if team_id else EventVisibility.CLUB,
+            visibility=EventVisibility.TEAM if team_id else EventVisibility.CLUB_WIDE,
             location='Sporthalle Handball-Club',
             start_time=start,
             end_time=end
