@@ -163,8 +163,9 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 // Helper hook for role checking
 export const useRole = () => {
   const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDevMode = useAuthStore((state) => state.isDevMode);
-  
+
   return {
     isAdmin: user?.role === UserRole.ADMIN,
     isCoach: user?.role === UserRole.COACH || user?.role === UserRole.ADMIN,
@@ -173,6 +174,7 @@ export const useRole = () => {
     isParent: user?.role === UserRole.PARENT,
     role: user?.role,
     user,
+    isAuthenticated,
     isDevMode,
   };
 };
