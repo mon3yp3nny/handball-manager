@@ -1,13 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Calendar } from 'lucide-react';
 import { api } from '@/services/api';
+import { useUIStore } from '@/store/authStore';
 import { Event, EventType, EventTypeLabels } from '@/types';
 
 export const EventsPage = () => {
+  // Scoped to the active team chosen in the sidebar (all visible if none).
+  const teamId = useUIStore((s) => s.currentTeam?.id);
   const { data: events, isLoading, isError } = useQuery({
-    queryKey: ['events'],
+    queryKey: ['events', teamId ?? null],
     queryFn: async () => {
-      const res = await api.get('/events?limit=100');
+      const qs = teamId ? `?team_id=${teamId}&limit=100` : '?limit=100';
+      const res = await api.get('/events' + qs);
       return res.items || [];
     },
   });

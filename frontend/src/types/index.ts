@@ -35,6 +35,12 @@ export interface PublicTeam {
   age_group?: string;
 }
 
+// The current user's teams, split for the team-scoped sidebar.
+export interface MyTeams {
+  managed: PublicTeam[];  // teams the user coaches
+  member: PublicTeam[];   // user's own team + any team their child plays in
+}
+
 // A pending registration in an approver's queue.
 export interface PendingRegistration {
   id: number;

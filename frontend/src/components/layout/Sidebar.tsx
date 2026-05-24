@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -9,11 +10,12 @@ import {
   ClipboardCheck,
   User,
   Shield,
+  ShieldCheck,
   UserCheck,
   X,
 } from 'lucide-react';
-import { useRole } from '@/store/authStore';
-import { UserRole } from '@/types';
+import { useRole, useUIStore } from '@/store/authStore';
+import { UserRole, PublicTeam } from '@/types';
 import { api } from '@/services/api';
 import { ClubCrest } from '@/components/brand/ClubCrest';
 
@@ -27,32 +29,30 @@ type NavItem = {
   label: string;
   icon: typeof LayoutDashboard;
   roles: UserRole[];
-  section: 'verein' | 'mannschaft';
 };
 
-// Sections mirror the design — "Verein" (club-wide) above "Mannschaft"
-// (team-scoped). Both groups apply to every role today; the section
-// split is a visual grouping, not an RBAC distinction.
-const navItems: NavItem[] = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard, section: 'verein',
+// "Allgemein" — club-wide items that don't depend on a selected team.
+const generalItems: NavItem[] = [
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard,
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/teams', label: 'Mannschaften', icon: Shield, section: 'verein',
+  { path: '/teams', label: 'Mannschaften', icon: Shield,
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/games', label: 'Spiele', icon: Trophy, section: 'verein',
+  { path: '/games', label: 'Spiele', icon: Trophy,
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/news', label: 'News', icon: Newspaper, section: 'verein',
+  { path: '/news', label: 'News', icon: Newspaper,
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/approvals', label: 'Genehmigungen', icon: UserCheck, section: 'verein',
+  { path: '/approvals', label: 'Genehmigungen', icon: UserCheck,
     roles: [UserRole.ADMIN, UserRole.COACH] },
+  { path: '/profile', label: 'Profil', icon: User,
+    roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
+];
 
-  { path: '/players', label: 'Spieler', icon: Users, section: 'mannschaft',
-    roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/events', label: 'Training & Termine', icon: Calendar, section: 'mannschaft',
-    roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/attendance', label: 'Anwesenheit', icon: ClipboardCheck, section: 'mannschaft',
-    roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
-  { path: '/profile', label: 'Profil', icon: User, section: 'mannschaft',
-    roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
+// Team-scoped items — repeated under each team section; they filter their
+// pages by the active team (set when the item is clicked).
+const teamItems: { path: string; label: string; icon: typeof LayoutDashboard }[] = [
+  { path: '/players', label: 'Spieler', icon: Users },
+  { path: '/events', label: 'Training & Termine', icon: Calendar },
+  { path: '/attendance', label: 'Anwesenheit', icon: ClipboardCheck },
 ];
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -63,12 +63,96 @@ const ROLE_LABEL: Record<UserRole, string> = {
   [UserRole.PARENT]: 'Eltern',
 };
 
+const linkClass = (active: boolean) =>
+  `flex items-center gap-3 px-3 py-2.5 rounded-tvf-sm text-sm font-semibold transition-colors ${
+    active
+      ? 'bg-tvf-red text-white shadow-tvf-sm'
+      : 'text-tvf-ink-on-navy/85 hover:bg-white/5 hover:text-tvf-ink-on-navy'
+  }`;
+
+// One team section ("Meine Trainer-Mannschaft" / "Meine Mannschaft").
+// Has its own selected team (a dropdown when more than one); clicking a
+// page activates that team globally so the page filters to it.
+function TeamSection({
+  title,
+  icon: SectionIcon,
+  teams,
+  onNavigate,
+}: {
+  title: string;
+  icon: typeof LayoutDashboard;
+  teams: PublicTeam[];
+  onNavigate: () => void;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentTeam, setCurrentTeam } = useUIStore();
+  const [selectedId, setSelectedId] = useState<number>(teams[0].id);
+
+  // Keep selection valid if the team list changes (e.g. after refetch).
+  useEffect(() => {
+    if (!teams.some((t) => t.id === selectedId)) setSelectedId(teams[0].id);
+  }, [teams, selectedId]);
+
+  const selectedTeam = teams.find((t) => t.id === selectedId) ?? teams[0];
+
+  const go = (path: string) => {
+    setCurrentTeam(selectedTeam);
+    navigate(path);
+    onNavigate();
+  };
+
+  return (
+    <div>
+      <div className="tvf-eyebrow text-tvf-ink-on-navy/55 px-3 mb-1 flex items-center gap-2">
+        <SectionIcon className="w-3.5 h-3.5" />
+        <span>{title}</span>
+      </div>
+
+      {teams.length > 1 ? (
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(Number(e.target.value))}
+          className="mx-3 mb-2 w-[calc(100%-1.5rem)] bg-tvf-navy-deep text-tvf-ink-on-navy text-sm rounded-tvf-sm px-2 py-1.5 border border-white/10"
+        >
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.age_group ? ` (${t.age_group})` : ''}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <div className="px-3 mb-2 text-sm font-semibold text-tvf-ink-on-navy/90 truncate">
+          {selectedTeam.name}{selectedTeam.age_group ? ` (${selectedTeam.age_group})` : ''}
+        </div>
+      )}
+
+      <ul className="space-y-1">
+        {teamItems.map((item) => {
+          const active =
+            location.pathname === item.path && currentTeam?.id === selectedTeam.id;
+          return (
+            <li key={item.path}>
+              <button
+                type="button"
+                onClick={() => go(item.path)}
+                className={`w-full text-left ${linkClass(active)}`}
+              >
+                <item.icon className="w-5 h-5" />
+                <span>{item.label}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, role, isAdmin, isCoach } = useRole();
+  const { currentTeam, setCurrentTeam } = useUIStore();
 
-  // Pending-approval count for the Genehmigungen badge. Only approvers
-  // query it; the key is shared with ApprovalsPage + WS-invalidated, so
-  // the badge updates live as registrations arrive or are decided.
   const canApprove = isAdmin || isCoach;
   const { data: pending = [] } = useQuery({
     queryKey: ['pending-registrations'],
@@ -77,41 +161,24 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   });
   const pendingCount = pending.length;
 
-  const visible = role ? navItems.filter((i) => i.roles.includes(role)) : [];
-  const verein = visible.filter((i) => i.section === 'verein');
-  const mannschaft = visible.filter((i) => i.section === 'mannschaft');
+  const { data: myTeams } = useQuery({
+    queryKey: ['my-teams'],
+    queryFn: () => api.getMyTeams(),
+  });
+  const managed = useMemo(() => myTeams?.managed ?? [], [myTeams]);
+  const member = useMemo(() => myTeams?.member ?? [], [myTeams]);
 
-  const renderLink = (item: NavItem) => {
-    const badge = item.path === '/approvals' && pendingCount > 0 ? pendingCount : null;
-    return (
-      <li key={item.path}>
-        <NavLink
-          to={item.path}
-          onClick={onClose}
-          end={item.path === '/'}
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-tvf-sm text-sm font-semibold transition-colors ${
-              isActive
-                ? 'bg-tvf-red text-white shadow-tvf-sm'
-                : 'text-tvf-ink-on-navy/85 hover:bg-white/5 hover:text-tvf-ink-on-navy'
-            }`
-          }
-        >
-          <item.icon className="w-5 h-5" />
-          <span className="flex-1">{item.label}</span>
-          {badge !== null && (
-            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-tvf-red text-white text-xs font-bold">
-              {badge}
-            </span>
-          )}
-        </NavLink>
-      </li>
-    );
-  };
+  // Default the active team once teams load, so team pages have a scope.
+  useEffect(() => {
+    if (currentTeam) return;
+    const first = managed[0] ?? member[0];
+    if (first) setCurrentTeam(first);
+  }, [managed, member, currentTeam, setCurrentTeam]);
+
+  const general = role ? generalItems.filter((i) => i.roles.includes(role)) : [];
 
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-tvf-navy-deep/60 z-40 md:hidden"
@@ -119,14 +186,6 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         />
       )}
 
-      {/* Sidebar — dark navy with subtle diagonal stripe texture.
-          `fixed md:sticky` is the position; do NOT add `relative` to this
-          className — Tailwind's generated CSS has .relative AFTER .fixed,
-          so adding it here would silently turn off `fixed` (the nav would
-          take 100vh of layout space at the top of the page and push every
-          mobile route a full viewport down). The `tvf-stripes-overlay`
-          class uses position:absolute on ::before, which works fine with
-          `fixed` or `sticky` as the containing block. */}
       <nav
         className={`
           tvf-stripes-overlay
@@ -178,23 +237,56 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             </div>
           </div>
 
-          {/* Navigation — grouped */}
+          {/* Navigation */}
           <div className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
-            {verein.length > 0 && (
+            {general.length > 0 && (
               <div>
                 <div className="tvf-eyebrow text-tvf-ink-on-navy/55 px-3 mb-1">
-                  Verein
+                  Allgemein
                 </div>
-                <ul className="space-y-1">{verein.map(renderLink)}</ul>
+                <ul className="space-y-1">
+                  {general.map((item) => {
+                    const badge =
+                      item.path === '/approvals' && pendingCount > 0 ? pendingCount : null;
+                    return (
+                      <li key={item.path}>
+                        <NavLink
+                          to={item.path}
+                          onClick={onClose}
+                          end={item.path === '/'}
+                          className={({ isActive }) => linkClass(isActive)}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          <span className="flex-1">{item.label}</span>
+                          {badge !== null && (
+                            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-tvf-red text-white text-xs font-bold">
+                              {badge}
+                            </span>
+                          )}
+                        </NavLink>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             )}
-            {mannschaft.length > 0 && (
-              <div>
-                <div className="tvf-eyebrow text-tvf-ink-on-navy/55 px-3 mb-1">
-                  Mannschaft
-                </div>
-                <ul className="space-y-1">{mannschaft.map(renderLink)}</ul>
-              </div>
+
+            {managed.length > 0 && (
+              <TeamSection
+                title="Meine Trainer-Mannschaft"
+                icon={ShieldCheck}
+                teams={managed}
+                onNavigate={onClose}
+              />
+            )}
+
+            {member.length > 0 && (
+              <TeamSection
+                title="Meine Mannschaft"
+                icon={Users}
+                teams={member}
+                onNavigate={onClose}
+              />
             )}
           </div>
 

@@ -26,19 +26,25 @@ def get_attendance(
     game_id: Optional[int] = None,
     event_id: Optional[int] = None,
     player_id: Optional[int] = None,
+    team_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(Attendance)
-    
+
     if game_id:
         query = query.filter(Attendance.game_id == game_id)
-    
+
     if event_id:
         query = query.filter(Attendance.event_id == event_id)
-    
+
     if player_id:
         query = query.filter(Attendance.player_id == player_id)
+
+    # Scope to a team via its players (team-scoped navigation).
+    if team_id:
+        team_player_ids = [pid for (pid,) in db.query(Player.id).filter(Player.team_id == team_id)]
+        query = query.filter(Attendance.player_id.in_(team_player_ids))
     
     # Filter by role
     if current_user.has_role(UserRole.PLAYER):

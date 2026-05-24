@@ -149,6 +149,12 @@ class ApiService {
     return response.data;
   }
 
+  // The current user's teams (managed vs member) for the sidebar.
+  async getMyTeams(): Promise<import('@/types').MyTeams> {
+    const response = await this.client.get<import('@/types').MyTeams>('/teams/my');
+    return response.data;
+  }
+
   // Approval queue (approvers only).
   async getPendingRegistrations(): Promise<import('@/types').PendingRegistration[]> {
     const response = await this.client.get<import('@/types').PendingRegistration[]>('/registrations/pending');
