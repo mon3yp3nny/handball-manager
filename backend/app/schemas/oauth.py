@@ -3,6 +3,16 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
+from app.schemas.user import UserRole
+
+
+class OAuthRoleSelection(BaseModel):
+    """Initial role pick for a new OAuth user. requested_team_id is required
+    for player/parent (routes approval to that team's coach), like the
+    password-registration flow."""
+    role: UserRole
+    requested_team_id: Optional[int] = None
+
 
 class OAuthLoginRequest(BaseModel):
     """Request to login via OAuth token from frontend."""

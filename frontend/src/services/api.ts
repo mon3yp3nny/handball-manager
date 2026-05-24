@@ -169,8 +169,11 @@ class ApiService {
     return;
   }
 
-  async setOAuthRole(role: UserRole): Promise<void> {
-    await this.client.post('/oauth/set-role', { role });
+  // requested_team_id is required by the backend for player/parent
+  // (routes approval to that team's coach). After this the OAuth user is
+  // PENDING approval — callers should refresh /auth/me.
+  async setOAuthRole(role: UserRole, requestedTeamId?: number): Promise<void> {
+    await this.client.post('/oauth/set-role', { role, requested_team_id: requestedTeamId });
   }
 
   async refreshToken(refreshToken: string): Promise<TokenResponse> {

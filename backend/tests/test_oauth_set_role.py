@@ -35,13 +35,63 @@ class TestSetRoleFirstTime:
         user = _make_oauth_user(db, email="newoauth@test.com")
         resp = client.post(
             "/api/v1/oauth/set-role",
-            params={"role": "coach"},
+            json={"role": "coach"},
             headers=_headers(user),
         )
         assert resp.status_code == 200
         db.refresh(user)
         assert user.role == UserRole.COACH
         assert user.role_selected is True
+
+
+class TestSetRoleApprovalParity:
+    """OAuth sign-ups must go through the same approval gate as password
+    registration — choosing a non-admin role drops them into PENDING."""
+
+    def test_coach_role_becomes_pending(self, client, db):
+        from app.models.user import ApprovalStatus
+        user = _make_oauth_user(db, email="oauthcoach@test.com")
+        resp = client.post(
+            "/api/v1/oauth/set-role",
+            json={"role": "coach"},
+            headers=_headers(user),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["approval_status"] == "pending"
+        db.refresh(user)
+        assert user.approval_status == ApprovalStatus.PENDING
+
+    def test_player_role_requires_team(self, client, db):
+        user = _make_oauth_user(db, email="oauthplayer@test.com")
+        resp = client.post(
+            "/api/v1/oauth/set-role",
+            json={"role": "player"},
+            headers=_headers(user),
+        )
+        assert resp.status_code == 400
+
+    def test_player_role_with_team_pends_and_creates_profile(self, client, db):
+        from app.models.user import ApprovalStatus
+        from app.models.player import Player
+        from app.models.team import Team
+        team = Team(name="OAuth FC", age_group="U14")
+        db.add(team)
+        db.commit()
+        db.refresh(team)
+
+        user = _make_oauth_user(db, email="oauthplayer2@test.com")
+        resp = client.post(
+            "/api/v1/oauth/set-role",
+            json={"role": "player", "requested_team_id": team.id},
+            headers=_headers(user),
+        )
+        assert resp.status_code == 200
+        db.refresh(user)
+        assert user.approval_status == ApprovalStatus.PENDING
+        assert user.requested_team_id == team.id
+        # Player profile created, unattached until approval.
+        player = db.query(Player).filter(Player.user_id == user.id).first()
+        assert player is not None and player.team_id is None
 
 
 class TestSetRoleEscalationBlocked:
@@ -52,7 +102,7 @@ class TestSetRoleEscalationBlocked:
         )
         resp = client.post(
             "/api/v1/oauth/set-role",
-            params={"role": "admin"},
+            json={"role": "admin"},
             headers=_headers(user),
         )
         assert resp.status_code == 403
@@ -65,7 +115,7 @@ class TestSetRoleEscalationBlocked:
         user = _make_oauth_user(db, email="wannabe-admin@test.com")
         resp = client.post(
             "/api/v1/oauth/set-role",
-            params={"role": "admin"},
+            json={"role": "admin"},
             headers=_headers(user),
         )
         assert resp.status_code == 403
@@ -80,7 +130,7 @@ class TestSetRoleEscalationBlocked:
         user = _make_user(db, email="password@test.com", role=UserRole.PLAYER)
         resp = client.post(
             "/api/v1/oauth/set-role",
-            params={"role": "coach"},
+            json={"role": "coach"},
             headers=_auth_header(user),
         )
         assert resp.status_code == 400

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { GoogleLogin, GoogleOAuthProvider, CredentialResponse } from '@react-oauth/google';
 import { useAuth } from '@/hooks/useAuth';
 import { UserLogin, UserRole } from '@/types';
@@ -8,6 +9,10 @@ import { Bug } from 'lucide-react';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
 import { ClubCrest } from '@/components/brand/ClubCrest';
+
+// Player/parent must pick a team during OAuth role selection (routes
+// approval to that team's coach), mirroring password registration.
+const TEAM_REQUIRED_ROLES = [UserRole.PLAYER, UserRole.PARENT];
 
 // Backend-seeded test accounts (see backend/scripts/setup_data.py).
 // Only rendered in dev builds.
@@ -23,7 +28,7 @@ const testAccounts: { label: string; email: string; password: string }[] = [
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const { isDevMode, devAutoLogin, setAuth } = useAuthStore();
+  const { isDevMode, devAutoLogin, setAuth, setUser } = useAuthStore();
   const [credentials, setCredentials] = useState<UserLogin>({
     email: '',
     password: '',
@@ -31,6 +36,15 @@ export const LoginPage = () => {
   const [needsRoleSelection, setNeedsRoleSelection] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | undefined>(undefined);
+
+  // Team picker options for the OAuth role-selection modal (player/parent).
+  const { data: teams = [], isLoading: teamsLoading } = useQuery({
+    queryKey: ['public-teams'],
+    queryFn: () => api.getPublicTeams(),
+    enabled: needsRoleSelection,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,17 +146,33 @@ export const LoginPage = () => {
     }
   };
 
-  const handleRoleSelection = async (role: UserRole) => {
+  const handleRoleSelection = async () => {
+    if (!selectedRole) return;
+    const needsTeam = TEAM_REQUIRED_ROLES.includes(selectedRole);
+    if (needsTeam && !selectedTeamId) {
+      toast.error('Bitte wähle ein Team aus.');
+      return;
+    }
     try {
-      await api.setOAuthRole(role);
-      toast.success('Rolle gespeichert! Anmeldung erfolgreich.');
+      await api.setOAuthRole(selectedRole, needsTeam ? selectedTeamId : undefined);
+      // The account is now PENDING approval — refresh /auth/me so the
+      // route guard shows the pending screen instead of the app shell.
+      try {
+        const me = await api.getMe();
+        setUser(me);
+      } catch {
+        // ignore — guard will re-fetch on next mount
+      }
+      setNeedsRoleSelection(false);
+      toast.success('Rolle gespeichert! Dein Konto muss noch freigegeben werden.');
       navigate('/');
     } catch (error) {
       toast.error('Fehler beim Speichern der Rolle.');
     }
   };
 
-  const roles = Object.values(UserRole);
+  // Public sign-up roles (no admin/supervisor self-assignment).
+  const roles = [UserRole.PLAYER, UserRole.PARENT, UserRole.COACH];
 
   // OAuth Client IDs from environment
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -279,13 +309,57 @@ export const LoginPage = () => {
                 {roles.map((role) => (
                   <button
                     key={role}
-                    onClick={() => handleRoleSelection(role)}
-                    className="w-full px-4 py-2 text-left rounded-lg border hover:bg-primary-50 hover:border-primary-300 transition-colors"
+                    onClick={() => {
+                      setSelectedRole(role);
+                      setSelectedTeamId(undefined);
+                    }}
+                    className={`w-full px-4 py-2 text-left rounded-lg border transition-colors ${
+                      selectedRole === role
+                        ? 'bg-primary-50 border-primary-400'
+                        : 'hover:bg-primary-50 hover:border-primary-300'
+                    }`}
                   >
                     <span className="font-medium">{roleLabels[role]}</span>
                   </button>
                 ))}
               </div>
+
+              {selectedRole && TEAM_REQUIRED_ROLES.includes(selectedRole) && (
+                <div className="mt-4">
+                  <label htmlFor="oauth-team" className="label">Team *</label>
+                  <select
+                    id="oauth-team"
+                    className="input"
+                    value={selectedTeamId ?? ''}
+                    onChange={(e) =>
+                      setSelectedTeamId(e.target.value ? Number(e.target.value) : undefined)
+                    }
+                  >
+                    <option value="" disabled>
+                      {teamsLoading ? 'Teams werden geladen…' : 'Team auswählen'}
+                    </option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.age_group ? ` (${t.age_group})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Der Trainer dieses Teams gibt deine Registrierung frei.
+                  </p>
+                </div>
+              )}
+
+              <button
+                onClick={handleRoleSelection}
+                disabled={!selectedRole}
+                className="btn-primary w-full mt-4 disabled:opacity-50"
+              >
+                Bestätigen
+              </button>
+              <p className="text-xs text-gray-500 mt-3 text-center">
+                Nach der Auswahl muss dein Konto noch freigegeben werden.
+              </p>
             </div>
           </div>
         )}
