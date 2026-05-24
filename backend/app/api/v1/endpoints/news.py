@@ -12,6 +12,7 @@ from app.models.team import Team
 from app.models.player import Player
 from app.schemas.news import NewsCreate, NewsUpdate, NewsResponse, NewsWithAuthor, NewsPublish
 from app.schemas.common import PaginatedResponse
+from app.websocket.manager import notify_resource
 
 router = APIRouter()
 
@@ -77,6 +78,7 @@ def create_news(
     db.add(db_news)
     db.commit()
     db.refresh(db_news)
+    notify_resource("news", "created")
     return db_news
 
 
@@ -120,9 +122,10 @@ def update_news(
     update_data = news_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(news, field, value)
-    
+
     db.commit()
     db.refresh(news)
+    notify_resource("news", "updated")
     return news
 
 
@@ -150,9 +153,10 @@ def publish_news(
         news.published_at = utcnow()
     else:
         news.published_at = None
-    
+
     db.commit()
     db.refresh(news)
+    notify_resource("news", "updated")
     return news
 
 
@@ -175,4 +179,5 @@ def delete_news(
     
     db.delete(news)
     db.commit()
+    notify_resource("news", "deleted")
     return {"message": "News deleted"}

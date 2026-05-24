@@ -1,6 +1,7 @@
+import asyncio
 import json
 import logging
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
@@ -12,9 +13,17 @@ class ConnectionManager:
         self.active_connections: Dict[int, WebSocket] = {}
         # team_subscriptions: {team_id: set(user_ids)}
         self.team_subscriptions: Dict[int, Set[int]] = {}
+        # The app's running event loop, captured at startup so sync request
+        # handlers (which run in a threadpool) can schedule broadcasts onto
+        # it via run_coroutine_threadsafe.
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
 
     async def connect(self, websocket: WebSocket, user_id: int):
-        await websocket.accept()
+        # The endpoint already accepted the handshake (it must, to read the
+        # auth cookie and send auth errors), so we only register here.
         self.active_connections[user_id] = websocket
 
     def disconnect(self, user_id: int):
@@ -59,7 +68,9 @@ class ConnectionManager:
     async def broadcast(self, message: dict):
         """Broadcast to all connected clients"""
         disconnected = []
-        for user_id, connection in self.active_connections.items():
+        # Snapshot first: send_text awaits, and a disconnect cleanup during
+        # iteration would mutate active_connections mid-loop.
+        for user_id, connection in list(self.active_connections.items()):
             try:
                 await connection.send_text(json.dumps(message))
             except (ConnectionError, RuntimeError) as exc:
@@ -70,6 +81,27 @@ class ConnectionManager:
         for user_id in disconnected:
             self.disconnect(user_id)
 
+    def notify(self, message: dict) -> None:
+        """Fire-and-forget broadcast schedulable from sync code.
+
+        Request handlers run in a threadpool with no running loop, so we
+        hand the coroutine to the captured app loop. No-op before startup
+        binds the loop (e.g. under unit tests with no live server).
+        """
+        if self._loop is None:
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(self.broadcast(message), self._loop)
+        except RuntimeError as exc:
+            logger.warning("notify scheduling failed: %s", exc)
+
 
 # Global connection manager instance
 manager = ConnectionManager()
+
+
+def notify_resource(resource: str, action: str) -> None:
+    """Tell every connected client that a resource changed so they can
+    invalidate their cached queries. Carries no row data — the client's
+    refetch goes through the REST API, which enforces per-user RBAC."""
+    manager.notify({"type": "resource_changed", "resource": resource, "action": action})
