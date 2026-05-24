@@ -53,6 +53,18 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 
 @pytest.fixture(autouse=True)
+def _disable_rate_limit():
+    """slowapi's limiter keeps per-IP counts for the whole process, so
+    across a test session the shared 'testserver' client trips limits
+    (e.g. /auth/register at 10/min). Tests don't exercise rate limiting,
+    so turn it off."""
+    from app.core.rate_limit import limiter
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
+@pytest.fixture(autouse=True)
 def db():
     """Create a clean database for every test."""
     Base.metadata.create_all(bind=test_engine)

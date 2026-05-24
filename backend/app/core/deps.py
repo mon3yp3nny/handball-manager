@@ -6,7 +6,16 @@ from typing import Optional
 from app.db.session import get_db
 from app.core.config import settings
 from app.core.security import decode_token
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, ApprovalStatus
+
+# Endpoints a not-yet-approved (PENDING/REJECTED) user may still reach — to
+# discover their status, change password, or log out. Every other endpoint
+# that resolves a user is gated, so a forgotten endpoint fails closed.
+_APPROVAL_EXEMPT_SUFFIXES = (
+    "/auth/me",
+    "/auth/logout",
+    "/auth/change-password",
+)
 
 # OAuth2 scheme stays — kept as the documented Bearer mechanism for
 # API clients (E2E suite, future mobile, curl). The cookie path below
@@ -51,6 +60,19 @@ def get_current_user(
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.is_active:
         raise credentials_exception
+
+    # Registration approval gate (defense-in-depth alongside the SPA's
+    # pending/rejected screens). A non-approved user may only reach the
+    # exempt endpoints above; data endpoints fail closed with 403.
+    if user.approval_status != ApprovalStatus.APPROVED:
+        path = request.url.path
+        if not any(path.endswith(s) for s in _APPROVAL_EXEMPT_SUFFIXES):
+            detail = (
+                "Your registration was declined."
+                if user.approval_status == ApprovalStatus.REJECTED
+                else "Your account is awaiting approval."
+            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
 
     # Attach user_id + role to the Sentry scope so any downstream
     # exception captured during this request carries identity. No-op
