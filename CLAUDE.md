@@ -18,43 +18,46 @@ Handball Manager is a full-stack club management app for handball teams. It hand
 
 ## Commands
 
-### Backend
-```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-alembic upgrade head                          # apply migrations
-uvicorn app.main:app --reload --port 8000     # dev server
-pytest                                         # run all tests
-pytest tests/test_auth.py                      # single test file
-pytest tests/test_auth.py::test_login -v       # single test
-pytest --cov=app                               # with coverage
-```
+> **Development & testing run against the GCP deployment, not a local stack.**
+> There is no local docker-compose / dev-server / mock-API workflow — features
+> are deployed to Cloud Run and exercised on the live URLs. The only things run
+> locally are the automated test/build gates below (they don't need a backend).
 
-### Frontend
+### Test & build gates (run locally / in CI before a deploy)
 ```bash
-cd frontend
-npm install
-npm run dev        # Vite dev server on port 3000
-npm run build      # production build
+# Backend — full suite uses an in-memory SQLite fixture, no DB needed
+cd backend
+python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+pytest                                     # all tests
+pytest tests/test_auth.py::test_login -v   # single test
+
+# Frontend
+cd frontend && npm install
+npm run build      # type-check + production bundle
 npm run lint       # ESLint
-npm run preview    # preview production build
-npx playwright test                    # run e2e tests (Playwright)
-npx playwright test tests/foo.spec.ts  # single e2e test file
+npx vitest run     # unit tests
 ```
 
-### Docker
+### Deploy to GCP (the dev/test environment)
 ```bash
-docker-compose up --build                        # full stack (frontend on :80, backend on :8000)
-docker-compose --profile dev up frontend-dev     # Vite dev server on :3000 instead of nginx
+# Backend — scripts/start.sh runs `alembic upgrade head` on container start,
+# so migrations apply automatically on deploy.
+gcloud builds submit backend/ --tag gcr.io/handball-club-manager/handball-backend:latest --region europe-west1
+gcloud run deploy handball-backend --image gcr.io/handball-club-manager/handball-backend:latest --region europe-west1
+
+# Frontend — MUST use the same-origin build (nginx proxies /api + /ws so the
+# auth cookie is first-party). Do NOT build the frontend any other way.
+gcloud builds submit --config=cloudbuild-frontend.yaml --region=europe-west1 .
+
+# Or the combined pipeline (backend+frontend tests, both images, both deploys):
+gcloud builds submit --config=cloudbuild.yaml --region=europe-west1 .
 ```
 
-### Database Migrations
+### Database migrations
 ```bash
 cd backend
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-alembic downgrade -1
+alembic revision --autogenerate -m "description"   # author a migration
+# Applied automatically on the next backend deploy (start.sh → alembic upgrade head).
 ```
 
 ## Architecture
@@ -81,9 +84,9 @@ websocket/    ConnectionManager singleton for real-time team broadcasts
 
 ```
 pages/        14 page components (auth, dashboard, teams, players, games, events, attendance, news, calendar, profile, parent dashboard)
-components/   Layout (AppLayout, Header, Sidebar, MobileNav) + dev tools (DevRoleSwitcher)
+components/   Layout (AppLayout, Header, Sidebar, MobileNav)
 store/        Zustand stores: authStore (auth state, UI state, notifications)
-services/     api.ts (Axios client with JWT interceptor + token refresh) and mockApi.ts (dev fallback)
+services/     api.ts (Axios client with httpOnly-cookie auth + CSRF + 401 refresh)
 hooks/        useAuth, useWebSocket, useParent
 types/        TypeScript interfaces for all domain entities
 ```
@@ -116,26 +119,25 @@ Permissions enforced at two levels:
 
 Connect to `/ws`, send `{"token": "<JWT>"}` to authenticate, then `{"action": "subscribe_team", "team_id": N}` to receive real-time team updates.
 
-## Dev Mode
+## Test accounts (on the GCP deployment)
 
-The frontend has a dev-only `DevRoleSwitcher` component with hardcoded demo users for quick role testing. Mock API (`mockApi.ts`) provides fallback data when the backend is unavailable. Both are tree-shaken from production builds.
-
-**Frontend-only demo accounts (mockApi / DevRoleSwitcher, no backend needed):** `admin@handball.de`, `coach@handball.de`, `supervisor@handball.de`, `spieler@handball.de`, `eltern@handball.de` (passwords: `admin123` / `coach123` / `parent123` etc. — only valid against `mockApi.ts`)
-
-**Backend-seeded accounts (real auth flow, run `backend/scripts/setup_data.py` first):**
+Seeded by `backend/scripts/setup_data.py` (idempotent; runnable on prod via the
+`handball-seed` Cloud Run Job — see `backend/scripts/deploy-seed-job.sh`):
 - `admin@handball.local` / `Admin123!` — Admin
-- `max.mustermann@example.com` / `Test123!` — Coach + Player + Parent (multi-role)
+- `max.mustermann@example.com` / `Test123!` — Coach (of two teams) + Player + Parent (good for the team-scoped sidebar switcher)
 - `anna.schmidt@example.com` / `Test123!` — Supervisor + Parent
 - `thomas.weber@example.com` / `Test123!` — Coach + Player
 - `lisa.mueller@example.com` / `Test123!` — Player only
 - `klaus.klein@example.com` / `Test123!` — Parent only
 
-The login page (`/login`) shows a click-to-fill list of backend-seeded accounts when running in dev builds.
-
 ## API Documentation
 
-When backend is running: Swagger at `http://localhost:8000/api/v1/docs`, ReDoc at `http://localhost:8000/api/v1/redoc`.
+On the deployed backend: Swagger at `/api/v1/docs`, ReDoc at `/api/v1/redoc`.
 
 ## Environment Variables
 
-Backend requires `.env` (copy from `.env.example`). Critical vars: `DATABASE_URL`, `SECRET_KEY` (fails on default), `GOOGLE_CLIENT_ID`, `APPLE_CLIENT_ID`. Frontend uses `VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`, and `VITE_APPLE_CLIENT_ID`.
+Configured on the Cloud Run services (not via local `.env`). Backend: `DATABASE_URL`,
+`SECRET_KEY` (fails on the placeholder default), `GOOGLE_CLIENT_ID`, `APPLE_CLIENT_ID`,
+`AUTH_COOKIE_SAMESITE`/`AUTH_COOKIE_SECURE`, `BACKEND_CORS_ORIGINS`, `FRONTEND_URL`.
+Frontend (baked at build time): `VITE_API_URL` (`/api/v1`, same-origin),
+`VITE_GOOGLE_CLIENT_ID`, `VITE_APPLE_CLIENT_ID`, `VITE_SENTRY_DSN`.

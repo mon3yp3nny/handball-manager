@@ -2,62 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, UserRole, PublicTeam, AppNotification } from '@/types';
 
-// Demo users for development - available in dev builds or when VITE_DEV_MODE is set
-const demoUsers: Record<UserRole, User> | null = (import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true')
-  ? {
-      [UserRole.ADMIN]: {
-        id: 'admin-1',
-        email: 'admin@handball.de',
-        first_name: 'Max',
-        last_name: 'Admin',
-        role: UserRole.ADMIN,
-        phone: '+49 123 456789',
-        created_at: new Date().toISOString(),
-        is_active: true,
-      },
-      [UserRole.COACH]: {
-        id: 'coach-1',
-        email: 'coach@handball.de',
-        first_name: 'Thomas',
-        last_name: 'Trainer',
-        role: UserRole.COACH,
-        phone: '+49 123 456790',
-        created_at: new Date().toISOString(),
-        is_active: true,
-      },
-      [UserRole.SUPERVISOR]: {
-        id: 'supervisor-1',
-        email: 'supervisor@handball.de',
-        first_name: 'Anna',
-        last_name: 'Betreuer',
-        role: UserRole.SUPERVISOR,
-        phone: '+49 123 456791',
-        created_at: new Date().toISOString(),
-        is_active: true,
-      },
-      [UserRole.PLAYER]: {
-        id: 'player-1',
-        email: 'spieler@handball.de',
-        first_name: 'Lukas',
-        last_name: 'Spieler',
-        role: UserRole.PLAYER,
-        phone: '+49 123 456792',
-        created_at: new Date().toISOString(),
-        is_active: true,
-      },
-      [UserRole.PARENT]: {
-        id: 'parent-1',
-        email: 'eltern@handball.de',
-        first_name: 'Maria',
-        last_name: 'Elternteil',
-        role: UserRole.PARENT,
-        phone: '+49 123 456793',
-        created_at: new Date().toISOString(),
-        is_active: true,
-      },
-    }
-  : null;
-
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -66,10 +10,6 @@ interface AuthState {
   setToken: (token: string | null) => void;
   setAuth: (user: User, token: string) => void;
   logout: () => void;
-  // Dev features
-  devAutoLogin: (role: UserRole) => void;
-  devSwitchRole: (role: UserRole) => void;
-  isDevMode: boolean;
 }
 
 interface UIState {
@@ -77,9 +17,6 @@ interface UIState {
   setSidebarOpen: (open: boolean) => void;
   currentTeam: PublicTeam | null;
   setCurrentTeam: (team: PublicTeam | null) => void;
-  // Dev role switcher
-  showDevSwitcher: boolean;
-  setShowDevSwitcher: (show: boolean) => void;
 }
 
 interface NotificationState {
@@ -89,15 +26,12 @@ interface NotificationState {
   clearNotifications: () => void;
 }
 
-const isDev = import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true';
-
 export const useAuthStore = create<AuthState>(
   persist(
     (set) => ({
       user: null,
       isAuthenticated: false,
       token: null,
-      isDevMode: isDev,
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       setToken: (token) => set({ token, isAuthenticated: !!token }),
       setAuth: (user, token) => set({ user, token, isAuthenticated: true }),
@@ -106,19 +40,6 @@ export const useAuthStore = create<AuthState>(
         // useAuth().logout calling /auth/logout (#42). Local cleanup
         // just resets the in-memory store.
         set({ user: null, token: null, isAuthenticated: false });
-      },
-      // Dev auto-login — local-only fixture for the DevRoleSwitcher.
-      // Token stays in memory; it's a dummy used by the mock API path,
-      // never a real credential.
-      devAutoLogin: (role) => {
-        if (!isDev || !demoUsers) return;
-        const user = demoUsers[role];
-        set({ user, token: 'dev-token', isAuthenticated: true, isDevMode: true });
-      },
-      devSwitchRole: (role) => {
-        if (!isDev || !demoUsers) return;
-        const user = demoUsers[role];
-        set({ user, token: 'dev-token', isAuthenticated: true });
       },
     }),
     {
@@ -129,11 +50,6 @@ export const useAuthStore = create<AuthState>(
       // ProtectedRoute render optimistically on reload without keeping
       // anything credential-shaped in localStorage.
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
-      merge: (persisted, current) => ({
-        ...current,
-        ...(persisted as Partial<AuthState>),
-        isDevMode: isDev,
-      }),
     }
   )
 );
@@ -143,8 +59,6 @@ export const useUIStore = create<UIState>((set) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   currentTeam: null,
   setCurrentTeam: (team) => set({ currentTeam: team }),
-  showDevSwitcher: isDev,
-  setShowDevSwitcher: (show) => set({ showDevSwitcher: show }),
 }));
 
 export const useNotificationStore = create<NotificationState>((set) => ({
@@ -164,7 +78,6 @@ export const useNotificationStore = create<NotificationState>((set) => ({
 export const useRole = () => {
   const user = useAuthStore((state) => state.user);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const isDevMode = useAuthStore((state) => state.isDevMode);
 
   return {
     isAdmin: user?.role === UserRole.ADMIN,
@@ -175,7 +88,6 @@ export const useRole = () => {
     role: user?.role,
     user,
     isAuthenticated,
-    isDevMode,
   };
 };
 

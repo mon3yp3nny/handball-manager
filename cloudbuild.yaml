@@ -81,13 +81,19 @@ steps:
   #   gcloud builds triggers update handball-main \
   #     --update-substitutions=_VITE_SENTRY_DSN=https://...
   # ); leaving it empty disables Sentry on the frontend.
+  # Same-origin build: Dockerfile.cloudrun serves the SPA behind an nginx
+  # that proxies /api + /ws to the backend, and VITE_API_URL=/api/v1 keeps
+  # the auth cookie first-party. Must match cloudbuild-frontend.yaml — a
+  # cross-origin VITE_API_URL or the plain Dockerfile re-breaks login.
   - id: frontend-build
     name: gcr.io/cloud-builders/docker
     dir: frontend
     args:
       - build
+      - -f
+      - Dockerfile.cloudrun
       - --build-arg
-      - VITE_API_URL=https://handball-backend-218596927281.europe-west1.run.app/api/v1
+      - VITE_API_URL=/api/v1
       - --build-arg
       - VITE_SENTRY_DSN=${_VITE_SENTRY_DSN}
       - --build-arg
