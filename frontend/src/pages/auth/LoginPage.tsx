@@ -192,45 +192,51 @@ export const LoginPage = () => {
         </div>
 
         <div className="card p-8">
-          {/* OAuth Login Buttons */}
-          <div className="space-y-3 mb-6">
-            {/* Google Sign In */}
-            {googleClientId && (
-              <div className="flex justify-center">
-                <GoogleOAuthProvider clientId={googleClientId}>
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => toast.error('Google-Anmeldung fehlgeschlagen')}
-                    useOneTap
-                  />
-                </GoogleOAuthProvider>
+          {/* Social login + the "oder" divider only render when at least
+              one OAuth provider is configured. Otherwise the divider would
+              sit at the top of the card with nothing above it. */}
+          {(googleClientId || appleClientId) && (
+            <>
+              <div className="space-y-3 mb-6">
+                {/* Google Sign In */}
+                {googleClientId && (
+                  <div className="flex justify-center">
+                    <GoogleOAuthProvider clientId={googleClientId}>
+                      <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => toast.error('Google-Anmeldung fehlgeschlagen')}
+                        useOneTap
+                      />
+                    </GoogleOAuthProvider>
+                  </div>
+                )}
+
+                {/* Apple Sign In Button */}
+                {appleClientId && (
+                  <button
+                    onClick={handleAppleSignIn}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                    disabled={isOAuthLoading}
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.2-.93 3.52-.84 1.55.1 2.68.67 3.44 1.65-2.88 1.68-2.24 5.98.22 7.13-.34 1.48-.84 2.9-1.26 4.23zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+                    </svg>
+                    <span>Mit Apple anmelden</span>
+                  </button>
+                )}
               </div>
-            )}
-            
-            {/* Apple Sign In Button */}
-            {appleClientId && (
-              <button
-                onClick={handleAppleSignIn}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
-                disabled={isOAuthLoading}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.2-.93 3.52-.84 1.55.1 2.68.67 3.44 1.65-2.88 1.68-2.24 5.98.22 7.13-.34 1.48-.84 2.9-1.26 4.23zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                </svg>
-                <span>Mit Apple anmelden</span>
-              </button>
-            )}
-          </div>
-          
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">oder</span>
-            </div>
-          </div>
-          
+
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">oder</span>
+                </div>
+              </div>
+            </>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="label">Email</label>
