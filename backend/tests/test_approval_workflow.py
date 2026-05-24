@@ -105,6 +105,24 @@ class TestApproveReject:
         )
         assert r.status_code == 403
 
+    def test_approve_player_whose_team_was_deleted(
+        self, client, db, team, admin_headers
+    ):
+        # Team chosen at sign-up is deleted before approval. requested_team_id
+        # is a soft ref; approval must not 500 on the players.team_id FK.
+        _register(client, "p4@test.com", "player", team_id=team.id)
+        pending = db.query(User).filter(User.email == "p4@test.com").first()
+        db.delete(team)
+        db.commit()
+        r = client.post(
+            f"/api/v1/registrations/{pending.id}/approve", headers=admin_headers
+        )
+        assert r.status_code == 200
+        db.refresh(pending)
+        assert pending.approval_status == ApprovalStatus.APPROVED
+        player = db.query(Player).filter(Player.user_id == pending.id).first()
+        assert player.team_id is None  # approved unassigned, no FK blowup
+
     def test_reject_sets_status_and_reason(self, client, db, admin_headers):
         _register(client, "coach3@test.com", "coach")
         pending = db.query(User).filter(User.email == "coach3@test.com").first()

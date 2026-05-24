@@ -93,11 +93,19 @@ def approve_registration(
     pending_user.approved_by_id = approver.id
     pending_user.approved_at = utcnow()
     pending_user.rejection_reason = None
-    # A newly-approved player joins the team they chose at sign-up.
+    # A newly-approved player joins the team they chose at sign-up — but
+    # only if it still exists. requested_team_id is a soft reference, while
+    # players.team_id is a real FK, so a team deleted between sign-up and
+    # approval would otherwise blow up the commit. If it's gone, the player
+    # is approved unassigned and a coach can place them later.
     if pending_user.role == UserRole.PLAYER and pending_user.requested_team_id:
-        player = db.query(Player).filter(Player.user_id == pending_user.id).first()
-        if player and player.team_id is None:
-            player.team_id = pending_user.requested_team_id
+        team_exists = db.query(Team.id).filter(
+            Team.id == pending_user.requested_team_id
+        ).first()
+        if team_exists:
+            player = db.query(Player).filter(Player.user_id == pending_user.id).first()
+            if player and player.team_id is None:
+                player.team_id = pending_user.requested_team_id
     db.commit()
     db.refresh(pending_user)
     logger.info("Registration approved: user_id=%s by approver_id=%s",
