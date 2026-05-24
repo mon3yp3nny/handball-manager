@@ -6,7 +6,6 @@ set -euo pipefail
 PROJECT_ID="handball-club-manager"
 REGION="europe-west1"
 BACKEND_IMAGE="gcr.io/${PROJECT_ID}/handball-backend"
-FRONTEND_IMAGE="gcr.io/${PROJECT_ID}/handball-frontend"
 
 echo "🔧 Building and deploying Handball Manager..."
 echo "Project: ${PROJECT_ID}"
@@ -35,25 +34,13 @@ gcloud run deploy handball-backend \
   --memory 512Mi \
   --cpu 1
 
-# Build and push frontend
-# VITE_API_URL (and any other VITE_* vars) are baked at build time via the
-# frontend Dockerfile's ARGs. The Dockerfile has sensible defaults pointing at
-# the live backend service; override here only if a different target is needed.
-echo "📦 Building frontend..."
-cd frontend
-gcloud builds submit --project ${PROJECT_ID} --tag ${FRONTEND_IMAGE}:latest .
-cd ..
-
-echo "🚀 Deploying frontend to Cloud Run..."
-gcloud run deploy handball-frontend \
-  --image ${FRONTEND_IMAGE}:latest \
-  --region ${REGION} \
-  --project ${PROJECT_ID} \
-  --platform managed \
-  --allow-unauthenticated \
-  --max-instances 5 \
-  --memory 256Mi \
-  --cpu 1
+# Build + deploy frontend via cloudbuild-frontend.yaml. It builds
+# Dockerfile.cloudrun (nginx proxies /api + /ws so the auth cookie stays
+# first-party, VITE_API_URL=/api/v1) and deploys to Cloud Run in one step.
+# Do NOT build the frontend with `--tag` / the default Dockerfile — that
+# bakes a cross-origin API URL and re-breaks login.
+echo "📦 Building + deploying frontend (same-origin)..."
+gcloud builds submit --project ${PROJECT_ID} --config cloudbuild-frontend.yaml --region ${REGION} .
 
 echo ""
 echo "✅ Deployment complete!"
