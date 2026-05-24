@@ -1,22 +1,24 @@
 # Cloud Build pipeline for Handball Manager (#57).
 #
-# Fires on every push to `main` once the trigger is connected:
+# Image tag comes from the _TAG substitution (default "latest"). On a
+# trigger, pass the commit SHA so images are immutable / rollback-able:
 #   gcloud builds triggers create github \
 #     --name=handball-main \
 #     --repo-name=handball-manager --repo-owner=mon3yp3nny \
 #     --branch-pattern=^main$ \
 #     --build-config=cloudbuild.yaml \
+#     --substitutions=_TAG=$SHORT_SHA \
 #     --project=handball-club-manager
 #
-# Also runnable on demand:
-#   gcloud builds submit --config cloudbuild.yaml \
-#     --project=handball-club-manager
+# Runnable on demand (tags :latest — does NOT require SHORT_SHA, which is
+# only populated for trigger builds):
+#   gcloud builds submit --config cloudbuild.yaml --region europe-west1 .
+#   # immutable tag: ... --substitutions=_TAG=$(git rev-parse --short HEAD)
 #
 # Flow:
-#   1. backend pytest gate (fails the build → no deploy)
+#   1. backend pytest + frontend vitest gates (a red gate → no deploy)
 #   2. backend + frontend Docker builds run in parallel
-#   3. images tagged BOTH with $SHORT_SHA (immutable, for rollback) AND
-#      :latest (so manual deploys with --image .../latest still work)
+#   3. images tagged ${_TAG}
 #   4. backend deploys first; frontend follows once backend's healthy.
 
 steps:
@@ -44,7 +46,7 @@ steps:
     args:
       - build
       - -t
-      - ${_BACKEND_IMAGE}:$SHORT_SHA
+      - ${_BACKEND_IMAGE}:${_TAG}
       - -t
       - ${_BACKEND_IMAGE}:latest
       - .
@@ -99,9 +101,9 @@ steps:
       - --build-arg
       - VITE_SENTRY_ENVIRONMENT=production
       - --build-arg
-      - VITE_GIT_SHA=$SHORT_SHA
+      - VITE_GIT_SHA=${_TAG}
       - -t
-      - ${_FRONTEND_IMAGE}:$SHORT_SHA
+      - ${_FRONTEND_IMAGE}:${_TAG}
       - -t
       - ${_FRONTEND_IMAGE}:latest
       - .
@@ -124,7 +126,7 @@ steps:
       - deploy
       - handball-backend
       - --image
-      - ${_BACKEND_IMAGE}:$SHORT_SHA
+      - ${_BACKEND_IMAGE}:${_TAG}
       - --region
       - ${_REGION}
       - --platform
@@ -136,7 +138,7 @@ steps:
       # env (DATABASE_URL, SECRET_KEY, SMTP_*, SENTRY_DSN, etc.) is
       # preserved. We only add/overwrite the release tag here. (#64)
       - --update-env-vars
-      - SENTRY_RELEASE=$SHORT_SHA,SENTRY_ENVIRONMENT=production
+      - SENTRY_RELEASE=${_TAG},SENTRY_ENVIRONMENT=production
       - --max-instances
       - '5'
       - --memory
@@ -152,7 +154,7 @@ steps:
       - deploy
       - handball-frontend
       - --image
-      - ${_FRONTEND_IMAGE}:$SHORT_SHA
+      - ${_FRONTEND_IMAGE}:${_TAG}
       - --region
       - ${_REGION}
       - --platform
@@ -166,18 +168,22 @@ steps:
       - '1'
     waitFor: ['frontend-push']
 
-# Surface the immutable SHA-tagged images in the build summary so
-# rollback is a one-liner: `gcloud run deploy ... --image .../<old-sha>`.
+# Surface the tagged images in the build summary so a rollback is a
+# one-liner: `gcloud run deploy ... --image .../<tag>`.
 images:
-  - ${_BACKEND_IMAGE}:$SHORT_SHA
+  - ${_BACKEND_IMAGE}:${_TAG}
   - ${_BACKEND_IMAGE}:latest
-  - ${_FRONTEND_IMAGE}:$SHORT_SHA
+  - ${_FRONTEND_IMAGE}:${_TAG}
   - ${_FRONTEND_IMAGE}:latest
 
 substitutions:
   _BACKEND_IMAGE: gcr.io/handball-club-manager/handball-backend
   _FRONTEND_IMAGE: gcr.io/handball-club-manager/handball-frontend
   _REGION: europe-west1
+  # Image tag. Defaults to "latest" so manual `gcloud builds submit` works
+  # without SHORT_SHA (only set on trigger builds). Triggers should pass
+  # _TAG=$SHORT_SHA for immutable, rollback-able tags.
+  _TAG: latest
   # Sentry frontend DSN — baked into the bundle at build time. Leave
   # empty to disable Sentry on the frontend. Override on the trigger
   # with: gcloud builds triggers update handball-main
