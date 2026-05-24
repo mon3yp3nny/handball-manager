@@ -1,13 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Users } from 'lucide-react';
 import { api } from '@/services/api';
+import { useUIStore } from '@/store/authStore';
 import { Player } from '@/types';
 
 export const PlayersPage = () => {
+  // Scoped to the active team chosen in the sidebar; no team selected
+  // (e.g. an admin with none) falls back to all visible players.
+  const teamId = useUIStore((s) => s.currentTeam?.id);
   const { data: players, isLoading, isError } = useQuery({
-    queryKey: ['players'],
+    queryKey: ['players', teamId ?? null],
     queryFn: async () => {
-      const res = await api.get('/players?limit=100');
+      const qs = teamId ? `?team_id=${teamId}&limit=100` : '?limit=100';
+      const res = await api.get('/players' + qs);
       return res.items || [];
     },
   });

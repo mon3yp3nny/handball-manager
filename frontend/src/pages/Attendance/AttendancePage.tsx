@@ -1,13 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheck } from 'lucide-react';
 import { api } from '@/services/api';
+import { useUIStore } from '@/store/authStore';
 import { Attendance, AttendanceStatus, AttendanceStatusLabels } from '@/types';
 
 export const AttendancePage = () => {
+  // Scoped to the active team chosen in the sidebar (all visible if none).
+  const teamId = useUIStore((s) => s.currentTeam?.id);
   const { data: records, isLoading, isError } = useQuery({
-    queryKey: ['attendance'],
+    queryKey: ['attendance', teamId ?? null],
     queryFn: async () => {
-      const res = await api.get('/attendance?limit=100');
+      const qs = teamId ? `?team_id=${teamId}&limit=100` : '?limit=100';
+      const res = await api.get('/attendance' + qs);
       return res.items || [];
     },
   });

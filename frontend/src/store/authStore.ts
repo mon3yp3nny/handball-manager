@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, UserRole, Team, AppNotification } from '@/types';
+import { User, UserRole, PublicTeam, AppNotification } from '@/types';
 
 // Demo users for development - available in dev builds or when VITE_DEV_MODE is set
 const demoUsers: Record<UserRole, User> | null = (import.meta.env.DEV || import.meta.env.VITE_DEV_MODE === 'true')
@@ -75,8 +75,8 @@ interface AuthState {
 interface UIState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  currentTeam: Team | null;
-  setCurrentTeam: (team: Team | null) => void;
+  currentTeam: PublicTeam | null;
+  setCurrentTeam: (team: PublicTeam | null) => void;
   // Dev role switcher
   showDevSwitcher: boolean;
   setShowDevSwitcher: (show: boolean) => void;

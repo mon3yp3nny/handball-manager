@@ -35,3 +35,11 @@ class PublicTeam(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MyTeams(BaseModel):
+    """The current user's teams, split for the team-scoped sidebar:
+    `managed` = teams they coach; `member` = their own team plus any
+    team a child of theirs plays in."""
+    managed: List[PublicTeam] = []
+    member: List[PublicTeam] = []

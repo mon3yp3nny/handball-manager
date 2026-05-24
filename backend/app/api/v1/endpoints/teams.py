@@ -12,9 +12,10 @@ from app.models.game import Game, GameStatus
 from app.models.event import Event
 from app.models.news import News
 from app.models.invitation import Invitation
+from app.models.parent_child import ParentChild
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamWithPlayers
 from app.schemas.common import PaginatedResponse
-from app.schemas.registration import PublicTeam
+from app.schemas.registration import PublicTeam, MyTeams
 
 router = APIRouter()
 
@@ -26,6 +27,43 @@ router = APIRouter()
 @router.get("/public", response_model=List[PublicTeam])
 def list_teams_public(db: Session = Depends(get_db)):
     return db.query(Team).order_by(Team.name).all()
+
+
+# The current user's teams for the team-scoped sidebar. `managed` = teams
+# they coach; `member` = their own player team + any team a child plays in.
+# Declared before /{team_id} so "my" isn't parsed as a team id.
+@router.get("/my", response_model=MyTeams)
+def get_my_teams(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Admins/supervisors oversee the whole club, so every team is
+    # "manageable" for them; coaches get the teams they actually coach.
+    if current_user.has_any_role([UserRole.ADMIN, UserRole.SUPERVISOR]):
+        managed = db.query(Team).order_by(Team.name).all()
+    else:
+        managed = (
+            db.query(Team).filter(Team.coach_id == current_user.id).order_by(Team.name).all()
+        )
+
+    member_team_ids = set()
+    own = db.query(Player).filter(Player.user_id == current_user.id).first()
+    if own and own.team_id:
+        member_team_ids.add(own.team_id)
+    child_team_rows = (
+        db.query(Player.team_id)
+        .join(ParentChild, ParentChild.child_id == Player.id)
+        .filter(ParentChild.parent_id == current_user.id, Player.team_id.isnot(None))
+        .distinct()
+        .all()
+    )
+    member_team_ids.update(tid for (tid,) in child_team_rows)
+
+    member = (
+        db.query(Team).filter(Team.id.in_(member_team_ids)).order_by(Team.name).all()
+        if member_team_ids else []
+    )
+    return {"managed": managed, "member": member}
 
 
 @router.get("/", response_model=PaginatedResponse[TeamResponse])
