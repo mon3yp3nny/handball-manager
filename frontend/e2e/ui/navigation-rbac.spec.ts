@@ -127,8 +127,12 @@ test.describe('Navigation & Role-Based UI', () => {
         { text: 'Termine', path: '/events' },
       ];
 
+      // Scope to the sidebar nav so we match real nav links, not anchors
+      // in page content. Team-scoped items (Spieler/Termine) live under the
+      // per-team sections; everything is a real <a href> now.
+      const sidebar = page.locator('nav').first();
       for (const route of routes) {
-        const link = page.locator(`a:has-text("${route.text}"), a[href="${route.path}"]`);
+        const link = sidebar.locator(`a[href="${route.path}"], a:has-text("${route.text}")`);
         if (await link.first().isVisible({ timeout: 2_000 }).catch(() => false)) {
           await link.first().click();
           await page.waitForTimeout(1_500);
