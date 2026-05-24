@@ -1,6 +1,6 @@
 """OAuth authentication endpoints."""
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -8,13 +8,17 @@ from app.db.session import get_db
 from app.core import security
 from app.core.deps import get_current_user
 from app.core.rate_limit import limiter
+from app.models.team import Team
+from app.models.player import Player
+from app.services.approval import notify_approvers_of_registration
+from app.websocket.manager import notify_resource
 from app.services.oauth_service import (
     verify_google_token,
     verify_apple_token,
     oauth_service
 )
-from app.schemas.oauth import OAuthLoginRequest, OAuthCallbackResponse
-from app.models.user import User, UserRole
+from app.schemas.oauth import OAuthLoginRequest, OAuthCallbackResponse, OAuthRoleSelection
+from app.models.user import User, UserRole, ApprovalStatus
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -145,20 +149,31 @@ async def apple_oauth_login(
 
 @router.post("/set-role")
 async def set_oauth_user_role(
-    role: UserRole,
+    selection: OAuthRoleSelection,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Set role for OAuth user during the initial registration flow.
+
     Idempotent guard (#88): once a user has chosen a role, this endpoint
     refuses further changes — preventing self-service privilege escalation.
+
+    Approval parity: like password registration, choosing a non-admin role
+    drops the OAuth user into PENDING approval (coach/supervisor → admin;
+    player/parent → the chosen team's coach, admin fallback). The user is
+    still APPROVED at the moment they reach here — they were created
+    approved and haven't picked a role yet — so the approval gate doesn't
+    block this call.
     """
     if not current_user.is_oauth_only:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Only OAuth users can set role this way",
         )
+
+    role = selection.role
 
     if current_user.role_selected:
         logger.warning(
@@ -179,9 +194,43 @@ async def set_oauth_user_role(
             detail="Admin role cannot be self-assigned",
         )
 
+    # Player/parent must pick a team so approval routes to its coach.
+    requested_team: Optional[Team] = None
+    if role in (UserRole.PLAYER, UserRole.PARENT):
+        if not selection.requested_team_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please select a team to register as a player or parent.",
+            )
+        requested_team = db.query(Team).filter(
+            Team.id == selection.requested_team_id
+        ).first()
+        if not requested_team:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected team does not exist.",
+            )
+
     current_user.role = role
     current_user.role_selected = True
+    current_user.approval_status = ApprovalStatus.PENDING
+    current_user.requested_team_id = requested_team.id if requested_team else None
+    # Mirror the password flow: a player gets a Player profile, unattached
+    # until approval. (OAuth users previously never got one.)
+    if role == UserRole.PLAYER:
+        existing = db.query(Player).filter(Player.user_id == current_user.id).first()
+        if not existing:
+            db.add(Player(user_id=current_user.id))
     db.commit()
+    db.refresh(current_user)
 
-    logger.info("OAuth user user_id=%s set role to %s", current_user.id, role.value)
-    return {"message": "Role updated successfully", "role": role.value}
+    logger.info("OAuth user user_id=%s set role to %s (pending approval)",
+                current_user.id, role.value)
+    notify_approvers_of_registration(db, current_user, requested_team, background_tasks)
+    notify_resource("registrations", "created")
+
+    return {
+        "message": "Role saved. Your account is awaiting approval.",
+        "role": role.value,
+        "approval_status": current_user.approval_status.value,
+    }
