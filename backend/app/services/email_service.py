@@ -276,5 +276,62 @@ Das Handball Manager Team
         
         return await self._send_email(to_email, subject, body_text, None)
 
+    async def send_registration_pending_to_approver(
+        self,
+        to_email: str,
+        approver_name: str,
+        applicant_name: str,
+        role: str,
+        team_name: Optional[str] = None,
+    ) -> bool:
+        """Tell an approver a new registration awaits their decision."""
+        role_display = self._get_role_display(role)
+        team_info = f" für das Team {team_name}" if team_name else ""
+        subject = "Neue Registrierung wartet auf Freigabe"
+        body_text = f"""Hallo {approver_name},
+
+{applicant_name} hat sich als {role_display}{team_info} registriert und wartet auf Ihre Freigabe.
+
+Bitte prüfen Sie die Anfrage in den Genehmigungen:
+{settings.FRONTEND_URL}/approvals
+
+Mit freundlichen Grüßen,
+Das Handball Manager Team
+"""
+        return await self._send_email(to_email, subject, body_text, None)
+
+    async def send_registration_approved(
+        self, to_email: str, first_name: str
+    ) -> bool:
+        """Tell an applicant their registration was approved."""
+        subject = "Ihre Registrierung wurde freigegeben"
+        body_text = f"""Hallo {first_name},
+
+Ihre Registrierung beim Handball Manager wurde freigegeben. Sie können sich jetzt anmelden:
+{settings.FRONTEND_URL}/login
+
+Mit freundlichen Grüßen,
+Das Handball Manager Team
+"""
+        return await self._send_email(to_email, subject, body_text, None)
+
+    async def send_registration_rejected(
+        self, to_email: str, first_name: str, reason: str
+    ) -> bool:
+        """Tell an applicant their registration was declined, with a reason."""
+        subject = "Ihre Registrierung wurde abgelehnt"
+        body_text = f"""Hallo {first_name},
+
+Ihre Registrierung beim Handball Manager wurde leider abgelehnt.
+
+Begründung: {reason}
+
+Bei Fragen wenden Sie sich bitte an Ihren Verein.
+
+Mit freundlichen Grüßen,
+Das Handball Manager Team
+"""
+        return await self._send_email(to_email, subject, body_text, None)
+
 
 email_service = EmailService()

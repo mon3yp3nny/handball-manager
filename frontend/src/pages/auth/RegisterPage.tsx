@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
 import { UserRole } from '@/types';
 import { roleLabels } from '@/store/authStore';
@@ -11,8 +12,14 @@ interface RegisterForm {
   first_name: string;
   last_name: string;
   phone?: string;
-  roles: UserRole[];
+  role: UserRole;
+  requested_team_id?: number;
 }
+
+// Public sign-up offers the non-privileged roles only. Admin is never
+// self-registered; supervisor is assigned by an admin later.
+const SELECTABLE_ROLES = [UserRole.PLAYER, UserRole.PARENT, UserRole.COACH];
+const TEAM_REQUIRED_ROLES = [UserRole.PLAYER, UserRole.PARENT];
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -22,21 +29,37 @@ export const RegisterPage = () => {
     first_name: '',
     last_name: '',
     phone: '',
-    roles: [UserRole.PLAYER],
+    role: UserRole.PLAYER,
   });
   const [isLoading, setIsLoading] = useState(false);
 
+  const needsTeam = TEAM_REQUIRED_ROLES.includes(form.role);
+
+  const { data: teams = [], isLoading: teamsLoading } = useQuery({
+    queryKey: ['public-teams'],
+    queryFn: () => api.getPublicTeams(),
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (needsTeam && !form.requested_team_id) {
+      toast.error('Bitte wähle ein Team aus.');
+      return;
+    }
     setIsLoading(true);
-    
     try {
       await api.register({
-        ...form,
+        email: form.email,
+        password: form.password,
+        first_name: form.first_name,
+        last_name: form.last_name,
         phone: form.phone || undefined,
-        roles: form.roles, // Send as array
+        role: form.role,
+        requested_team_id: needsTeam ? form.requested_team_id : undefined,
       });
-      toast.success('Registrierung erfolgreich! Bitte melde dich an.');
+      toast.success(
+        'Registrierung eingegangen! Dein Konto muss noch freigegeben werden.',
+      );
       navigate('/login');
     } catch (error: any) {
       const message = error?.response?.data?.detail || 'Registrierung fehlgeschlagen';
@@ -46,11 +69,11 @@ export const RegisterPage = () => {
     }
   };
 
-  const roles = [
-    { value: UserRole.PLAYER, label: roleLabels[UserRole.PLAYER] },
-    { value: UserRole.PARENT, label: roleLabels[UserRole.PARENT] },
-    { value: UserRole.COACH, label: roleLabels[UserRole.COACH] },
-  ];
+  const roleHints: Record<string, string> = {
+    [UserRole.PLAYER]: 'Spieler im Verein',
+    [UserRole.PARENT]: 'Elternteil eines Spielers',
+    [UserRole.COACH]: 'Trainer oder Betreuer',
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -65,7 +88,7 @@ export const RegisterPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">Handball Manager</h1>
           <p className="text-gray-600 mt-2">Neues Konto erstellen</p>
         </div>
-        
+
         <div className="bg-white rounded-xl shadow-sm border p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
@@ -92,7 +115,7 @@ export const RegisterPage = () => {
                 />
               </div>
             </div>
-            
+
             <div>
               <label htmlFor="email" className="label">E-Mail *</label>
               <input
@@ -104,7 +127,7 @@ export const RegisterPage = () => {
                 required
               />
             </div>
-            
+
             <div>
               <label htmlFor="phone" className="label">Telefon (optional)</label>
               <input
@@ -116,7 +139,7 @@ export const RegisterPage = () => {
                 placeholder="+49 123 456789"
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="label">Passwort *</label>
               <input
@@ -130,41 +153,56 @@ export const RegisterPage = () => {
               />
               <p className="text-xs text-gray-500 mt-1">Mindestens 8 Zeichen</p>
             </div>
-            
+
             <div>
-              <label className="label">Rollen im Verein *</label>
-              <p className="text-xs text-gray-500 mb-2">Mehrere Rollen möglich</p>
+              <label className="label">Rolle im Verein *</label>
               <div className="space-y-2">
-                {roles.map((role) => (
-                  <label key={role.value} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                {SELECTABLE_ROLES.map((role) => (
+                  <label key={role} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                     <input
-                      type="checkbox"
-                      name="roles"
-                      value={role.value}
-                      checked={form.roles.includes(role.value)}
-                      onChange={(e) => {
-                        const value = e.target.value as UserRole;
-                        if (e.target.checked) {
-                          setForm({ ...form, roles: [...form.roles, value] });
-                        } else {
-                          setForm({ ...form, roles: form.roles.filter(r => r !== value) });
-                        }
-                      }}
+                      type="radio"
+                      name="role"
+                      value={role}
+                      checked={form.role === role}
+                      onChange={() => setForm({ ...form, role, requested_team_id: undefined })}
                       className="mr-3"
                     />
                     <div>
-                      <div className="font-medium">{role.label}</div>
-                      <div className="text-xs text-gray-500">
-                        {role.value === UserRole.PLAYER && 'Spieler im Verein'}
-                        {role.value === UserRole.PARENT && 'Elternteil eines Spielers'}
-                        {role.value === UserRole.COACH && 'Trainer oder Betreuer'}
-                      </div>
+                      <div className="font-medium">{roleLabels[role]}</div>
+                      <div className="text-xs text-gray-500">{roleHints[role]}</div>
                     </div>
                   </label>
                 ))}
               </div>
             </div>
-            
+
+            {needsTeam && (
+              <div>
+                <label htmlFor="team" className="label">Team *</label>
+                <select
+                  id="team"
+                  className="input"
+                  value={form.requested_team_id ?? ''}
+                  onChange={(e) =>
+                    setForm({ ...form, requested_team_id: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                  required
+                >
+                  <option value="" disabled>
+                    {teamsLoading ? 'Teams werden geladen…' : 'Team auswählen'}
+                  </option>
+                  {teams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.age_group ? ` (${t.age_group})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Der Trainer dieses Teams gibt deine Registrierung frei.
+                </p>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isLoading}
@@ -173,7 +211,11 @@ export const RegisterPage = () => {
               {isLoading ? 'Wird registriert...' : 'Konto erstellen'}
             </button>
           </form>
-          
+
+          <p className="text-xs text-gray-500 mt-4 text-center">
+            Nach der Registrierung muss dein Konto freigegeben werden, bevor du dich vollständig anmelden kannst.
+          </p>
+
           <div className="mt-6 text-center text-sm">
             <span className="text-gray-500">Bereits registriert? </span>
             <Link to="/login" className="text-primary-600 hover:text-primary-700 font-medium">

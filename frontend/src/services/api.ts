@@ -136,10 +136,31 @@ class ApiService {
     return response.data;
   }
 
-  // Register new user
-  async register(userData: { email: string; password: string; first_name: string; last_name: string; phone?: string; role: UserRole }): Promise<User> {
+  // Register new user. requested_team_id is required by the backend for
+  // player/parent sign-ups (routes approval to that team's coach).
+  async register(userData: { email: string; password: string; first_name: string; last_name: string; phone?: string; role: UserRole; requested_team_id?: number }): Promise<User> {
     const response = await this.client.post<User>('/auth/register', userData);
     return response.data;
+  }
+
+  // Public team list for the sign-up team picker (no auth).
+  async getPublicTeams(): Promise<import('@/types').PublicTeam[]> {
+    const response = await this.client.get<import('@/types').PublicTeam[]>('/teams/public');
+    return response.data;
+  }
+
+  // Approval queue (approvers only).
+  async getPendingRegistrations(): Promise<import('@/types').PendingRegistration[]> {
+    const response = await this.client.get<import('@/types').PendingRegistration[]>('/registrations/pending');
+    return response.data;
+  }
+
+  async approveRegistration(userId: number): Promise<void> {
+    await this.client.post(`/registrations/${userId}/approve`);
+  }
+
+  async rejectRegistration(userId: number, reason: string): Promise<void> {
+    await this.client.post(`/registrations/${userId}/reject`, { reason });
   }
 
   // Delete user account

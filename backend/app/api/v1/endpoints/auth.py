@@ -9,10 +9,13 @@ from app.core import security
 from app.core.config import settings
 from app.core.deps import get_db, get_current_user, require_admin
 from app.core.rate_limit import limiter
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, ApprovalStatus
+from app.models.team import Team
 from app.services.email_service import email_service
+from app.services.approval import notify_approvers_of_registration
 from app.models.player import Player
 from app.schemas.user import TokenResponse, LoginRequest, UserResponse, UserCreate
+from app.websocket.manager import notify_resource
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +43,13 @@ def register(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """Register a new user (public endpoint)."""
+    """Register a new user (public endpoint).
+
+    New sign-ups land in PENDING approval (see ApprovalStatus): coaches and
+    supervisors are approved by an admin; players and parents by the coach
+    of their chosen team (admin fallback). Admin self-registration is not
+    allowed — there's no public path to that privilege.
+    """
     # Check if email exists
     if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
@@ -48,9 +57,35 @@ def register(
             detail="Email already registered"
         )
 
+    if user_data.role == UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts cannot be self-registered.",
+        )
+
+    # Players and parents must pick a team so approval can route to its
+    # coach. Validate the team exists; coaches/supervisors ignore it.
+    requested_team: Optional[Team] = None
+    if user_data.role in (UserRole.PLAYER, UserRole.PARENT):
+        if not user_data.requested_team_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Please select a team to register as a player or parent.",
+            )
+        requested_team = db.query(Team).filter(
+            Team.id == user_data.requested_team_id
+        ).first()
+        if not requested_team:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected team does not exist.",
+            )
+
     # Register user + (optional) player profile atomically (#94). Flush to
     # get db_user.id without committing, attach the Player in the same
     # session, single final commit means we either get both or neither.
+    # The Player is created WITHOUT a team — it's assigned only once the
+    # coach approves, so pending players never appear on a roster.
     db_user = User(
         email=user_data.email,
         hashed_password=security.get_password_hash(user_data.password),
@@ -59,6 +94,8 @@ def register(
         phone=user_data.phone,
         role=user_data.role,
         is_verified=True,
+        approval_status=ApprovalStatus.PENDING,
+        requested_team_id=requested_team.id if requested_team else None,
     )
     db.add(db_user)
     db.flush()
@@ -72,21 +109,18 @@ def register(
     activity = UserActivity(
         user_id=db_user.id,
         activity_type=ActivityType.CREATED,
-        description="User registered via web"
+        description="User registered via web (pending approval)"
     )
     db.add(activity)
     db.commit()
 
-    logger.info("New user registered: user_id=%s, email=%s, role=%s",
+    logger.info("New user registered (pending): user_id=%s, email=%s, role=%s",
                 db_user.id, db_user.email, db_user.role.value)
 
-    # Welcome email — best-effort via BackgroundTasks (failures are
-    # logged inside the service; we don't fail the registration).
-    background_tasks.add_task(
-        email_service.send_welcome_email,
-        to_email=db_user.email,
-        first_name=db_user.first_name,
-    )
+    # Email the relevant approver(s) — best-effort, never fails the request.
+    notify_approvers_of_registration(db, db_user, requested_team, background_tasks)
+    # Nudge any open approver queues to refresh in real time.
+    notify_resource("registrations", "created")
 
     return db_user
 

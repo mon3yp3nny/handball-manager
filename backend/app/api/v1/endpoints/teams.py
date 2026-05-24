@@ -14,8 +14,18 @@ from app.models.news import News
 from app.models.invitation import Invitation
 from app.schemas.team import TeamCreate, TeamUpdate, TeamResponse, TeamWithPlayers
 from app.schemas.common import PaginatedResponse
+from app.schemas.registration import PublicTeam
 
 router = APIRouter()
+
+
+# Public — no auth. Feeds the team picker on the registration form so a
+# prospective player/parent can choose the team whose coach approves them.
+# Exposes id/name/age_group only. Declared before /{team_id} so "public"
+# isn't captured as a team id.
+@router.get("/public", response_model=List[PublicTeam])
+def list_teams_public(db: Session = Depends(get_db)):
+    return db.query(Team).order_by(Team.name).all()
 
 
 @router.get("/", response_model=PaginatedResponse[TeamResponse])

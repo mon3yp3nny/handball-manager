@@ -16,6 +16,16 @@ class UserRole(str, enum.Enum):
     PARENT = "parent"
 
 
+class ApprovalStatus(str, enum.Enum):
+    """Registration approval state. New public sign-ups start PENDING and
+    must be approved (coaches/supervisors by an admin; players/parents by
+    the coach of their chosen team, admin as fallback). Everything created
+    server-side (seed scripts, admin-created users) defaults APPROVED."""
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class User(Base):
     __tablename__ = "users"
     
@@ -36,6 +46,24 @@ class User(Base):
     # JSON list of role values (e.g. '["coach","player","parent"]'). Holds the
     # full multi-role assignment; `role` above is the primary/legacy single role.
     roles_data = Column(Text, nullable=True)
+    # Registration approval workflow. Defaults APPROVED at the DB level so all
+    # existing/seeded users are unaffected; the public /auth/register endpoint
+    # explicitly sets PENDING. requested_team_id is the team chosen at sign-up
+    # (routes the approval to that team's coach and, for players, becomes the
+    # Player.team_id once approved).
+    approval_status = Column(
+        Enum(ApprovalStatus), default=ApprovalStatus.APPROVED,
+        server_default=ApprovalStatus.APPROVED.value, nullable=False, index=True,
+    )
+    # Soft reference to the team chosen at sign-up — intentionally NOT a FK.
+    # A hard FK would create a users<->teams cycle (teams.coach_id already
+    # points back here), which breaks metadata ordering. The team may also
+    # be deleted later; every read of this column already handles a missing
+    # team, so a dangling id is fine.
+    requested_team_id = Column(Integer, nullable=True)
+    approved_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
     # Per-user secret token for the iCalendar (.ics) subscription URL. The
     # calendar endpoint is bearerless (calendar apps don't send Authorization
     # headers), so this token IS the credential. Generated lazily on first
@@ -52,6 +80,10 @@ class User(Base):
     sent_invitations = relationship("Invitation", foreign_keys="Invitation.invited_by", back_populates="inviter")
     activities = relationship("UserActivity", back_populates="user", order_by="desc(UserActivity.created_at)")
     
+    @property
+    def is_approved(self) -> bool:
+        return self.approval_status == ApprovalStatus.APPROVED
+
     @property
     def roles(self) -> list:
         """Full list of UserRole enum values for this user.

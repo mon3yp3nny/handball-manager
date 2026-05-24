@@ -16,6 +16,7 @@ const INVALIDATION_MAP: Record<string, string[][]> = {
   events: [['events'], ['upcoming-events'], ['child-team-events'], ['dashboard-widgets']],
   news: [['news']],
   attendance: [['attendance'], ['child-attendance'], ['dashboard-widgets']],
+  registrations: [['pending-registrations']],
 };
 
 export const AppLayout = () => {

@@ -12,6 +12,12 @@ class UserRole(str, Enum):
     PARENT = "parent"
 
 
+class ApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 # Base schemas
 #
 # email/phone are kept loose on UserBase because this schema is also used
@@ -34,6 +40,9 @@ class UserCreate(UserBase):
     email: EmailStr
     phone: Optional[str] = Field(None, max_length=30, pattern=r"^\+?[\d\s\-()]{6,30}$")
     password: str = Field(..., min_length=8, max_length=128)
+    # Team chosen at sign-up. Required (frontend-enforced) for player/parent
+    # so approval routes to that team's coach; ignored for coach/supervisor.
+    requested_team_id: Optional[int] = None
 
 
 # Update schemas
@@ -51,6 +60,8 @@ class UserResponse(UserBase):
     is_active: bool
     is_verified: bool
     roles: List[UserRole] = []
+    approval_status: ApprovalStatus = ApprovalStatus.APPROVED
+    rejection_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
