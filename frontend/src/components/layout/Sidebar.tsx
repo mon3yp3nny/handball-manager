@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   Users,
@@ -8,10 +9,12 @@ import {
   ClipboardCheck,
   User,
   Shield,
+  UserCheck,
   X,
 } from 'lucide-react';
 import { useRole } from '@/store/authStore';
 import { UserRole } from '@/types';
+import { api } from '@/services/api';
 import { ClubCrest } from '@/components/brand/ClubCrest';
 
 interface SidebarProps {
@@ -39,6 +42,8 @@ const navItems: NavItem[] = [
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
   { path: '/news', label: 'News', icon: Newspaper, section: 'verein',
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
+  { path: '/approvals', label: 'Genehmigungen', icon: UserCheck, section: 'verein',
+    roles: [UserRole.ADMIN, UserRole.COACH] },
 
   { path: '/players', label: 'Spieler', icon: Users, section: 'mannschaft',
     roles: [UserRole.ADMIN, UserRole.COACH, UserRole.SUPERVISOR, UserRole.PLAYER, UserRole.PARENT] },
@@ -59,31 +64,50 @@ const ROLE_LABEL: Record<UserRole, string> = {
 };
 
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-  const { user, role } = useRole();
+  const { user, role, isAdmin, isCoach } = useRole();
+
+  // Pending-approval count for the Genehmigungen badge. Only approvers
+  // query it; the key is shared with ApprovalsPage + WS-invalidated, so
+  // the badge updates live as registrations arrive or are decided.
+  const canApprove = isAdmin || isCoach;
+  const { data: pending = [] } = useQuery({
+    queryKey: ['pending-registrations'],
+    queryFn: () => api.getPendingRegistrations(),
+    enabled: canApprove,
+  });
+  const pendingCount = pending.length;
 
   const visible = role ? navItems.filter((i) => i.roles.includes(role)) : [];
   const verein = visible.filter((i) => i.section === 'verein');
   const mannschaft = visible.filter((i) => i.section === 'mannschaft');
 
-  const renderLink = (item: NavItem) => (
-    <li key={item.path}>
-      <NavLink
-        to={item.path}
-        onClick={onClose}
-        end={item.path === '/'}
-        className={({ isActive }) =>
-          `flex items-center gap-3 px-3 py-2.5 rounded-tvf-sm text-sm font-semibold transition-colors ${
-            isActive
-              ? 'bg-tvf-red text-white shadow-tvf-sm'
-              : 'text-tvf-ink-on-navy/85 hover:bg-white/5 hover:text-tvf-ink-on-navy'
-          }`
-        }
-      >
-        <item.icon className="w-5 h-5" />
-        <span>{item.label}</span>
-      </NavLink>
-    </li>
-  );
+  const renderLink = (item: NavItem) => {
+    const badge = item.path === '/approvals' && pendingCount > 0 ? pendingCount : null;
+    return (
+      <li key={item.path}>
+        <NavLink
+          to={item.path}
+          onClick={onClose}
+          end={item.path === '/'}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-tvf-sm text-sm font-semibold transition-colors ${
+              isActive
+                ? 'bg-tvf-red text-white shadow-tvf-sm'
+                : 'text-tvf-ink-on-navy/85 hover:bg-white/5 hover:text-tvf-ink-on-navy'
+            }`
+          }
+        >
+          <item.icon className="w-5 h-5" />
+          <span className="flex-1">{item.label}</span>
+          {badge !== null && (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-tvf-red text-white text-xs font-bold">
+              {badge}
+            </span>
+          )}
+        </NavLink>
+      </li>
+    );
+  };
 
   return (
     <>

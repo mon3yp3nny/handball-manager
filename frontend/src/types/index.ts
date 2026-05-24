@@ -7,6 +7,12 @@ export enum UserRole {
   PARENT = 'parent',
 }
 
+export enum ApprovalStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+}
+
 export interface User {
   id: string;
   email: string;
@@ -16,8 +22,30 @@ export interface User {
   role: UserRole;          // primary role (legacy, still drives single-role UI)
   roles?: UserRole[];      // full multi-role list when populated by backend
   is_active: boolean;
+  approval_status?: ApprovalStatus;  // registration approval gate
+  rejection_reason?: string;
   created_at: string;
   updated_at?: string;
+}
+
+// A team as shown on the public sign-up picker (no auth required).
+export interface PublicTeam {
+  id: number;
+  name: string;
+  age_group?: string;
+}
+
+// A pending registration in an approver's queue.
+export interface PendingRegistration {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: UserRole;
+  roles: UserRole[];
+  requested_team_id?: number | null;
+  requested_team_name?: string | null;
+  created_at: string;
 }
 
 export interface UserLogin {

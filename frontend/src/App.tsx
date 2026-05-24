@@ -2,12 +2,14 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, useEffect } from 'react';
 import { useAuthStore, useRole } from '@/store/authStore';
 import { api } from '@/services/api';
+import { ApprovalStatus } from '@/types';
 
 // Layout — eagerly loaded; it wraps every protected route, so lazying
 // it would only buy a few KB at the cost of a flash on every cold start.
 import { AppLayout } from '@/components/layout/AppLayout';
 import { RouteBoundary } from '@/components/RouteBoundary';
 import { PageLoader } from '@/components/PageLoader';
+import { AccountStatusPage } from '@/pages/AccountStatusPage';
 import { lazyNamed } from '@/lib/lazy';
 
 // Pages — lazy-loaded so each route is its own chunk (#102). Visitors
@@ -31,6 +33,7 @@ const NewsPage = lazyNamed(() => import('@/pages/News/NewsPage'), 'NewsPage');
 const NewsDetailPage = lazyNamed(() => import('@/pages/News/NewsDetailPage'), 'NewsDetailPage');
 const AttendancePage = lazyNamed(() => import('@/pages/Attendance/AttendancePage'), 'AttendancePage');
 const ProfilePage = lazyNamed(() => import('@/pages/ProfilePage'), 'ProfilePage');
+const ApprovalsPage = lazyNamed(() => import('@/pages/Approvals/ApprovalsPage'), 'ApprovalsPage');
 const NotFoundPage = lazyNamed(() => import('@/pages/NotFoundPage'), 'NotFoundPage');
 
 // Protected route wrapper. After #42 the credential is an httpOnly
@@ -39,9 +42,17 @@ const NotFoundPage = lazyNamed(() => import('@/pages/NotFoundPage'), 'NotFoundPa
 // optimistically; if the cookie is invalid the next API call will 401
 // and the route guard sends the user to /login.
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useRole();
+  const { isAuthenticated, user } = useRole();
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  // Registration approval gate. A pending/rejected user can authenticate
+  // but gets a status screen instead of the app (the backend also 403s
+  // their data calls). approval_status is absent on a stale persisted
+  // user blob — treat that as approved until /auth/me refreshes it.
+  const status = user?.approval_status;
+  if (status && status !== ApprovalStatus.APPROVED) {
+    return <AccountStatusPage status={status} reason={user?.rejection_reason} />;
   }
   return <>{children}</>;
 };
@@ -145,6 +156,9 @@ function App() {
 
           {/* Profile */}
           <Route path="profile" element={<ProfilePage />} />
+
+          {/* Approvals (coach/admin) */}
+          <Route path="approvals" element={<ApprovalsPage />} />
 
           {/* 404 */}
           <Route path="*" element={<NotFoundPage />} />
