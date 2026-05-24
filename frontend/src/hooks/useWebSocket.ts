@@ -4,29 +4,40 @@ import { useAuthStore } from '@/store/authStore';
 type WebSocketMessage = {
   type: string;
   data?: unknown;
+  // Present on resource_changed broadcasts (see backend notify_resource).
+  resource?: string;
+  action?: string;
+  // Present on error frames.
+  message?: string;
 };
 
 export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) => {
   const [isConnected, setIsConnected] = useState(false);
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
-  const token = useAuthStore((state) => state.token);
+  // Set when we close on purpose (unmount / logout) so the onclose handler
+  // doesn't fire the 5s reconnect against a now-stale closure.
+  const closedIntentionally = useRef(false);
+  // After #42 the access token is an httpOnly cookie JS can't read; it
+  // rides the WS upgrade handshake automatically (same-origin /ws proxy),
+  // so the server authenticates from the cookie. We only need to know
+  // *whether* the user is logged in to decide when to connect.
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const connect = useCallback(() => {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     try {
-      const WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`;
+      closedIntentionally.current = false;
+      const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const WS_URL = import.meta.env.VITE_WS_URL || `${scheme}://${window.location.host}/ws`;
       ws.current = new WebSocket(WS_URL);
 
       ws.current.onopen = () => {
         console.log('WebSocket connected');
         setIsConnected(true);
-        
-        // Send authentication
-        if (ws.current) {
-          ws.current.send(JSON.stringify({ token }));
-        }
+        // No auth message needed — the httpOnly cookie authenticated the
+        // handshake server-side.
       };
 
       ws.current.onmessage = (event) => {
@@ -54,7 +65,9 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
       ws.current.onclose = () => {
         console.log('WebSocket disconnected');
         setIsConnected(false);
-        
+
+        // Don't reconnect if we closed deliberately (unmount / logout).
+        if (closedIntentionally.current) return;
         // Try to reconnect after 5 seconds
         reconnectTimeout.current = setTimeout(() => {
           connect();
@@ -67,9 +80,10 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
     } catch (error) {
       console.error('Failed to connect WebSocket:', error);
     }
-  }, [token, onMessage]);
+  }, [isAuthenticated, onMessage]);
 
   const disconnect = useCallback(() => {
+    closedIntentionally.current = true;
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
     }
@@ -93,14 +107,14 @@ export const useWebSocket = (onMessage?: (message: WebSocketMessage) => void) =>
   }, [send]);
 
   useEffect(() => {
-    if (token) {
+    if (isAuthenticated) {
       connect();
     }
 
     return () => {
       disconnect();
     };
-  }, [token, connect, disconnect]);
+  }, [isAuthenticated, connect, disconnect]);
 
   return {
     isConnected,

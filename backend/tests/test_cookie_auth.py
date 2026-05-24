@@ -134,3 +134,26 @@ class TestRefreshFromCookie:
         assert r.status_code == 200
         new_access = r.json()["access_token"]
         assert new_access
+
+
+class TestWebSocketCookieAuth:
+    """The /ws handshake authenticates from the access_token cookie (#42)
+    — the SPA no longer has JS access to the token to send in a message."""
+
+    def test_ws_authenticates_via_cookie(self, client, admin_user):
+        client.post(
+            "/api/v1/auth/login",
+            data={"username": admin_user.email, "password": "testpassword123"},
+        )
+        # TestClient carries the session cookies onto the WS upgrade.
+        with client.websocket_connect("/ws") as ws:
+            msg = ws.receive_json()
+            assert msg["type"] == "connected"
+            assert msg["user_id"] == admin_user.email
+
+    def test_ws_rejects_without_cookie(self, client):
+        # No login → no cookie. The server accepts, then sends an error
+        # frame and closes.
+        with client.websocket_connect("/ws") as ws:
+            msg = ws.receive_json()
+            assert msg["type"] == "error"

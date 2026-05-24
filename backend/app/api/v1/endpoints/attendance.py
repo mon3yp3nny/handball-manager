@@ -14,6 +14,7 @@ from app.schemas.attendance import (
     AttendanceWithPlayer, BulkAttendanceUpdate
 )
 from app.schemas.common import PaginatedResponse
+from app.websocket.manager import notify_resource
 
 router = APIRouter()
 
@@ -94,6 +95,8 @@ def initialize_event_attendance(
             created_count += 1
     
     db.commit()
+    if created_count:
+        notify_resource("attendance", "created")
     return {"message": f"Created {created_count} attendance records", "created": created_count}
 
 
@@ -142,6 +145,7 @@ def create_attendance(
     db.add(db_record)
     db.commit()
     db.refresh(db_record)
+    notify_resource("attendance", "created")
     return db_record
 
 
@@ -207,6 +211,7 @@ def update_attendance(
     record.recorded_by = current_user.id
     db.commit()
     db.refresh(record)
+    notify_resource("attendance", "updated")
     return record
 
 
@@ -252,8 +257,9 @@ def bulk_update_attendance(
             db.add(record)
         
         updated_records.append(record)
-    
+
     db.commit()
+    notify_resource("attendance", "updated")
     return updated_records
 
 

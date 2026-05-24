@@ -6,7 +6,7 @@
  * scrubs credentials before send, drops 4xx axios errors — without
  * involving the real SDK or network.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the sentry-react module before importing the wrapper. The mock
 // has to be hoisted because vi.mock factories run before imports.

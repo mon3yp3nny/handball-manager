@@ -12,6 +12,7 @@ from app.models.team import Team
 from app.models.player import Player
 from app.schemas.event import EventCreate, EventUpdate, EventResponse, EventWithTeam
 from app.schemas.common import PaginatedResponse
+from app.websocket.manager import notify_resource
 
 router = APIRouter()
 
@@ -96,6 +97,7 @@ def create_event(
     db.add(db_event)
     db.commit()
     db.refresh(db_event)
+    notify_resource("events", "created")
     return db_event
 
 
@@ -146,9 +148,10 @@ def update_event(
     
     for field, value in update_data.items():
         setattr(event, field, value)
-    
+
     db.commit()
     db.refresh(event)
+    notify_resource("events", "updated")
     return event
 
 
@@ -169,6 +172,7 @@ def delete_event(
     
     db.delete(event)
     db.commit()
+    notify_resource("events", "deleted")
     return {"message": "Event deleted"}
 
 

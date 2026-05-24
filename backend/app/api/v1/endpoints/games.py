@@ -14,6 +14,7 @@ from app.models.match_report import MatchReport
 from app.schemas.game import GameCreate, GameUpdate, GameResponse, GameWithTeam, GameResultUpdate
 from app.schemas.match_report import MatchReportCreate, MatchReportResponse, MatchReportUpdate
 from app.schemas.common import PaginatedResponse
+from app.websocket.manager import notify_resource
 
 router = APIRouter()
 
@@ -79,6 +80,7 @@ def create_game(
     db.add(db_game)
     db.commit()
     db.refresh(db_game)
+    notify_resource("games", "created")
     return db_game
 
 
@@ -120,9 +122,10 @@ def update_game(
     update_data = game_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(game, field, value)
-    
+
     db.commit()
     db.refresh(game)
+    notify_resource("games", "updated")
     return game
 
 
@@ -147,9 +150,10 @@ def update_game_result(
     game.home_score = result_data.home_score
     game.away_score = result_data.away_score
     game.status = result_data.status
-    
+
     db.commit()
     db.refresh(game)
+    notify_resource("games", "updated")
     return game
 
 
@@ -170,6 +174,7 @@ def delete_game(
     
     db.delete(game)
     db.commit()
+    notify_resource("games", "deleted")
     return {"message": "Game deleted"}
 
 

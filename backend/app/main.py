@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request
@@ -33,6 +34,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     settings.validate_required_secrets()
+    # Capture the running loop so sync request handlers can schedule
+    # WebSocket broadcasts onto it (see manager.notify).
+    manager.bind_loop(asyncio.get_running_loop())
     logger.info("Starting up Handball Manager API...")
     yield
     # Shutdown - dispose of the DB engine to release all pooled connections
@@ -94,33 +98,16 @@ def health_check():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
 
-    # Wait for authentication
+    # Authenticate from the httpOnly access_token cookie (#42). The cookie
+    # rides the WS upgrade handshake automatically now that /ws is served
+    # same-origin behind the frontend proxy — the SPA no longer has (and
+    # must not have) JS access to the token to send it in a message.
     try:
-        auth_message = await websocket.receive_text()
-        auth_data = {}
-        try:
-            auth_data = json.loads(auth_message)
-        except json.JSONDecodeError:
-            await websocket.send_text(json.dumps({"type": "error", "message": "Invalid JSON"}))
-            await websocket.close()
-            return
-
-        token = auth_data.get("token")
-        if not token:
-            await websocket.send_text(json.dumps({"type": "error", "message": "No token provided"}))
-            await websocket.close()
-            return
-
-        # Validate token
-        payload = decode_token(token)
-        if not payload:
-            await websocket.send_text(json.dumps({"type": "error", "message": "Invalid token"}))
-            await websocket.close()
-            return
-
-        user_id = payload.get("sub")
+        token = websocket.cookies.get(settings.AUTH_COOKIE_NAME_ACCESS)
+        payload = decode_token(token) if token else None
+        user_id = payload.get("sub") if payload else None
         if not user_id:
-            await websocket.send_text(json.dumps({"type": "error", "message": "Invalid token"}))
+            await websocket.send_text(json.dumps({"type": "error", "message": "Not authenticated"}))
             await websocket.close()
             return
 
