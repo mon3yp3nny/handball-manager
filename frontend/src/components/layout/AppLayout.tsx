@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { MobileNav } from './MobileNav';
-import { DevRoleSwitcher } from '@/components/dev/DevRoleSwitcher';
 import { RouteBoundary } from '@/components/RouteBoundary';
 import { useWebSocket } from '@/hooks/useWebSocket';
 
@@ -66,9 +65,6 @@ export const AppLayout = () => {
         {/* Mobile bottom nav */}
         <MobileNav />
       </div>
-
-      {/* Dev Role Switcher - only in development */}
-      {import.meta.env.DEV && <DevRoleSwitcher />}
     </div>
   );
 };

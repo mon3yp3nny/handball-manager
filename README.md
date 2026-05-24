@@ -78,66 +78,35 @@ VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 
 ## Quick Start
 
-### Prerequisites
-- Docker and Docker Compose
-- Node.js 20+ (for local frontend development)
-- Python 3.11+ (for local backend development)
-- Apple Developer account (for Apple Sign In)
-- Google Cloud project (for Google Sign In)
+### Environment
 
-### Docker Compose Setup
+Development and testing run **against the GCP (Cloud Run) deployment** — there is
+no local docker-compose / dev-server workflow. Code is deployed to Cloud Run and
+exercised on the live URLs. See `CLAUDE.md` for the deploy commands.
+
+### Test & build gates (local / CI)
+
+Only the automated checks run locally — they don't need a running backend:
 
 ```bash
-# Clone the repository
-cd handball-manager
+# Backend tests (in-memory SQLite fixture)
+cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+pytest
 
-# Set environment variables (create .env file)
-cp .env.example .env
-# Edit .env with your OAuth credentials
-
-# Build and run with docker-compose
-docker-compose up --build
-
-# Access the application
-# Frontend: http://localhost
-# Backend API: http://localhost:8000/api/v1
-# API Documentation: http://localhost:8000/api/v1/docs
+# Frontend build + lint + unit tests
+cd frontend && npm install
+npm run build && npm run lint && npx vitest run
 ```
 
-### Development Setup
-
-#### Backend
+### Deploy
 
 ```bash
-cd backend
+# Backend (migrations apply automatically on container start)
+gcloud builds submit backend/ --tag gcr.io/handball-club-manager/handball-backend:latest --region europe-west1
+gcloud run deploy handball-backend --image gcr.io/handball-club-manager/handball-backend:latest --region europe-west1
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-cp .env.example .env
-# Edit .env with your configuration
-
-# Run the server
-uvicorn app.main:app --reload --port 8000
-```
-
-#### Frontend
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# The app will be available at http://localhost:3000
+# Frontend (same-origin build)
+gcloud builds submit --config=cloudbuild-frontend.yaml --region=europe-west1 .
 ```
 
 ## Project Structure
@@ -164,9 +133,10 @@ handball-manager/
 │   │   ├── store/          # State management
 │   │   └── types/          # TypeScript types
 │   ├── package.json
-│   └── Dockerfile
+│   └── Dockerfile.cloudrun   # same-origin nginx (proxies /api + /ws)
 ├── mobile/                  # Future mobile apps (placeholder)
-├── docker-compose.yml
+├── cloudbuild.yaml          # CI/CD: tests + build + deploy both services
+├── cloudbuild-frontend.yaml # frontend-only build + deploy
 └── README.md
 ```
 
@@ -330,12 +300,8 @@ alembic downgrade -1
 
 ## Deployment
 
-### Production Build
-
-```bash
-# Build and run
-docker-compose -f docker-compose.prod.yml up --build -d
-```
+Deployed on Google Cloud Run (backend + frontend services, Cloud SQL Postgres).
+See `CLAUDE.md` for the `gcloud builds submit` / `gcloud run deploy` commands.
 
 ### Continuous Deployment (Cloud Build)
 

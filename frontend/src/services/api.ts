@@ -1,12 +1,9 @@
 import axios, { AxiosError, AxiosInstance } from 'axios';
 import { User, UserLogin, TokenResponse, OAuthLoginResponse, UserRole } from '@/types';
-// Only import mock API in development - Vite tree-shakes this in production
-import mockApi from './mockApi';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-
-// Mock API fallback is only used in development when no backend URL is set
-let useMockApi = !import.meta.env.VITE_API_URL && import.meta.env.DEV;
+// Same-origin in deployment (nginx proxies /api). The default is only a
+// fallback for tooling; the deployed bundle is built with VITE_API_URL.
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // Read a cookie by name; used to pull the csrf_token (NOT httpOnly,
 // readable from JS by design — see backend/app/core/csrf.py). Returns
@@ -83,32 +80,8 @@ class ApiService {
     );
   }
 
-  async checkBackend(): Promise<boolean> {
-    if (!useMockApi) return true;
-    try {
-      // Health check should hit /api/v1/health/live (backend health endpoint)
-      await this.client.get('/health/live', { timeout: 2000 });
-      useMockApi = false;
-      return true;
-    } catch {
-      useMockApi = true;
-      return false;
-    }
-  }
-
   // Auth
   async login(credentials: UserLogin): Promise<TokenResponse> {
-    if (useMockApi) {
-      const result = await mockApi.login(credentials.email, credentials.password);
-      if (!result) throw new Error('Login failed');
-      return {
-        access_token: result.access_token,
-        refresh_token: 'mock-refresh-token',
-        token_type: 'bearer',
-        user: result.user,
-      };
-    }
-    
     const formData = new URLSearchParams();
     formData.append('username', credentials.email);
     formData.append('password', credentials.password);
@@ -202,51 +175,19 @@ class ApiService {
   }
 
   async getMe(): Promise<User> {
-    if (useMockApi) {
-      const user = await mockApi.getMe();
-      if (!user) throw new Error('Not authenticated');
-      return user;
-    }
-    
     const response = await this.client.get<User>('/auth/me');
     return response.data;
   }
 
-  // Generic methods with mock fallback
+  // Generic passthrough methods.
   async get<T>(path: string, params?: Record<string, string>): Promise<T> {
-    if (useMockApi) {
-      return mockApi.get(path + (params ? '?' + new URLSearchParams(params).toString() : '')) as Promise<T>;
-    }
-    
-    try {
-      const response = await this.client.get<T>(path, { params });
-      return response.data;
-    } catch (error) {
-      // If request fails, try mock
-      if (import.meta.env.DEV) {
-        console.log('Backend unavailable, using mock data');
-        useMockApi = true;
-        return mockApi.get(path) as Promise<T>;
-      }
-      throw error;
-    }
+    const response = await this.client.get<T>(path, { params });
+    return response.data;
   }
 
   async post<T>(path: string, data?: unknown): Promise<T> {
-    if (useMockApi) {
-      return mockApi.post(path, data) as Promise<T>;
-    }
-    
-    try {
-      const response = await this.client.post<T>(path, data);
-      return response.data;
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        useMockApi = true;
-        return mockApi.post(path, data) as Promise<T>;
-      }
-      throw error;
-    }
+    const response = await this.client.post<T>(path, data);
+    return response.data;
   }
 
   async put<T>(path: string, data?: unknown): Promise<T> {
@@ -255,27 +196,11 @@ class ApiService {
   }
 
   async patch<T>(path: string, data?: unknown): Promise<T> {
-    if (useMockApi) {
-      return mockApi.patch(path, data) as Promise<T>;
-    }
-    
-    try {
-      const response = await this.client.patch<T>(path, data);
-      return response.data;
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        useMockApi = true;
-        return mockApi.patch(path, data) as Promise<T>;
-      }
-      throw error;
-    }
+    const response = await this.client.patch<T>(path, data);
+    return response.data;
   }
 
   async delete<T>(path: string): Promise<T> {
-    if (useMockApi) {
-      return mockApi.delete(path) as Promise<T>;
-    }
-    
     const response = await this.client.delete<T>(path);
     return response.data;
   }
