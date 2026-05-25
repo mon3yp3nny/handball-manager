@@ -1,19 +1,23 @@
 export const API_BASE = process.env.API_BASE_URL ?? 'https://handball-backend-218596927281.europe-west1.run.app';
 export const APP_BASE = process.env.APP_BASE_URL ?? 'https://handball-frontend-218596927281.europe-west1.run.app';
 
+// Accounts seeded on the deployment. Admin comes from setup_data.py /
+// reset_db.py; the coach + parent are approved accounts from the
+// season-storyline seed (seed_storyline.py). All storyline accounts share
+// the Saison2627! password.
 export const ADMIN_CREDENTIALS = {
-  email: 'admin@handball.de',
-  password: 'admin123',
+  email: 'admin@handball.local',
+  password: 'Admin123!',
 };
 
 export const COACH_CREDENTIALS = {
-  email: 'coach@handball.de',
-  password: 'coach123',
+  email: 'stefan.brandt@tvf.de',
+  password: 'Saison2627!',
 };
 
 export const PARENT_CREDENTIALS = {
-  email: 'eltern@handball.de',
-  password: 'parent123',
+  email: 'ralf.mertens@tvf.de',
+  password: 'Saison2627!',
 };
 
 /** Generate a unique name using timestamp + random suffix */
