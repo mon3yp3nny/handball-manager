@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard,
@@ -84,7 +84,6 @@ function TeamSection({
   teams: PublicTeam[];
   onNavigate: () => void;
 }) {
-  const navigate = useNavigate();
   const location = useLocation();
   const { currentTeam, setCurrentTeam } = useUIStore();
   const [selectedId, setSelectedId] = useState<number>(teams[0].id);
@@ -95,12 +94,6 @@ function TeamSection({
   }, [teams, selectedId]);
 
   const selectedTeam = teams.find((t) => t.id === selectedId) ?? teams[0];
-
-  const go = (path: string) => {
-    setCurrentTeam(selectedTeam);
-    navigate(path);
-    onNavigate();
-  };
 
   return (
     <div>
@@ -133,14 +126,19 @@ function TeamSection({
             location.pathname === item.path && currentTeam?.id === selectedTeam.id;
           return (
             <li key={item.path}>
-              <button
-                type="button"
-                onClick={() => go(item.path)}
-                className={`w-full text-left ${linkClass(active)}`}
+              {/* A real link (accessible + cmd-clickable). onClick sets this
+                  section's team as the active scope before navigating. */}
+              <Link
+                to={item.path}
+                onClick={() => {
+                  setCurrentTeam(selectedTeam);
+                  onNavigate();
+                }}
+                className={linkClass(active)}
               >
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
-              </button>
+              </Link>
             </li>
           );
         })}
